@@ -3610,24 +3610,28 @@ function bulkDelete(){
       loadLocal(); startFirebase(); return;
     }
   }
+  // GitHub Pages: 설정 모달 없이 자동으로 data.json 로드
+  if(location.hostname.includes('github.io')){
+    document.getElementById('setup-modal').classList.add('hidden');
+    fetch('./data.json?t=' + Date.now())
+      .then(r=>{ if(!r.ok) throw new Error('no data.json'); return r.json(); })
+      .then(data=>{
+        if(data.markers && data.markers.length > 0){
+          localStorage.setItem('ms', JSON.stringify(data.markers));
+          localStorage.setItem('data_ver', DATA_VER);
+        }
+        if(data.lines && data.lines.length > 0){
+          localStorage.setItem('ls', JSON.stringify(data.lines));
+        }
+        loadLocal();
+      })
+      .catch(()=>{ loadLocal(); }); // data.json 없으면 INITIAL_DATA로 폴백
+    return;
+  }
+
   if(s==='local'){
     document.getElementById('setup-modal').classList.add('hidden');
-    // GitHub Pages면 data.json 우선 로드
-    if(location.hostname.includes('github.io')){
-      fetch('./data.json?t=' + Date.now())
-        .then(r=>r.json()).then(data=>{
-          if(data.markers && data.markers.length > 0){
-            localStorage.setItem('ms', JSON.stringify(data.markers));
-            localStorage.setItem('data_ver', DATA_VER);
-          }
-          if(data.lines && data.lines.length > 0){
-            localStorage.setItem('ls', JSON.stringify(data.lines));
-          }
-          loadLocal();
-        }).catch(()=>loadLocal());
-    } else {
-      loadLocal();
-    }
+    loadLocal();
   }
 })();
 </script>
