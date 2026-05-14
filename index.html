@@ -390,6 +390,101 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
     min-height:36px;
   }
 }
+
+/* ── GPS 내 위치 버튼 (데스크탑 + 모바일 공통) ── */
+#gps-btn{
+  position:absolute;
+  bottom:40px;left:10px;
+  z-index:800;
+  width:42px;height:42px;
+  background:#fff;
+  border:1.5px solid #dde3ea;
+  border-radius:50%;
+  box-shadow:0 2px 8px rgba(0,0,0,.18);
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;
+  transition:background .15s;
+}
+#gps-btn:hover{background:#e8f5e9}
+#gps-btn.locating{animation:gpsPulse .8s ease-in-out infinite alternate}
+@keyframes gpsPulse{from{box-shadow:0 0 0 0 rgba(76,175,80,.4)}to{box-shadow:0 0 0 8px rgba(76,175,80,0)}}
+
+/* ── 모바일 스피드 다이얼 FAB ── */
+#fab-wrap{
+  display:none; /* 모바일에서만 표시 */
+  position:fixed;
+  bottom:52px; right:14px;
+  z-index:1350;
+  flex-direction:column-reverse;
+  align-items:flex-end;
+  gap:10px;
+}
+#fab-main{
+  width:56px;height:56px;
+  background:#1a4f8a;
+  border-radius:50%;
+  border:none;
+  color:#fff;font-size:26px;
+  box-shadow:0 4px 16px rgba(0,0,0,.3);
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .25s, background .2s;
+  flex-shrink:0;
+}
+#fab-main.open{background:#c0392b;transform:rotate(45deg)}
+#fab-items{
+  display:flex;flex-direction:column-reverse;gap:10px;
+  align-items:flex-end;
+  overflow:hidden;
+  max-height:0;
+  transition:max-height .3s ease;
+}
+#fab-items.open{max-height:500px}
+.fab-item{
+  display:flex;align-items:center;gap:10px;
+  opacity:0;transform:translateY(10px);
+  transition:opacity .2s, transform .2s;
+  pointer-events:none;
+}
+#fab-items.open .fab-item{
+  opacity:1;transform:translateY(0);
+  pointer-events:auto;
+}
+.fab-item-btn{
+  width:46px;height:46px;
+  border-radius:50%;
+  border:none;
+  background:#fff;
+  box-shadow:0 2px 10px rgba(0,0,0,.2);
+  font-size:20px;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .15s;
+  flex-shrink:0;
+}
+.fab-item-btn.active-tool{background:#1a4f8a;color:#fff}
+.fab-item-btn:active{transform:scale(.92)}
+.fab-item-lbl{
+  background:rgba(0,0,0,.65);
+  color:#fff;
+  font-size:12px;font-weight:700;
+  padding:4px 10px;border-radius:14px;
+  white-space:nowrap;
+}
+
+@media(max-width:768px){
+  /* 모바일에서 기존 툴바 숨기고 FAB로 대체 */
+  #map-toolbar{ display:none!important; }
+  #fab-wrap{ display:flex; }
+  #gps-btn{
+    bottom:52px;
+    left:auto;right:80px;
+  }
+}
+@media(min-width:769px){
+  #fab-wrap{display:none!important}
+}
 </style>
 </head>
 <body>
@@ -762,7 +857,25 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
     <div class="pp-title">⚡ 배치할 카테고리 선택</div>
     <div id="pp-list"></div>
   </div>
+
+  <!-- GPS 내 위치 버튼 -->
+  <button id="gps-btn" onclick="goToMyLocation()" title="내 위치로 이동">📍</button>
 </div>
+
+<!-- 모바일 스피드 다이얼 FAB -->
+<div id="fab-wrap">
+  <div id="fab-items">
+    <div class="fab-item"><span class="fab-item-lbl">뒤로가기</span><button class="fab-item-btn" id="fab-undo" onclick="undoLast();closeFab()" >↩</button></div>
+    <div class="fab-item"><span class="fab-item-lbl">다중 선택</span><button class="fab-item-btn" id="fab-multi" onclick="toggleMultiSelect();closeFab()">📦</button></div>
+    <div class="fab-item"><span class="fab-item-lbl">이동 모드</span><button class="fab-item-btn" id="fab-drag" onclick="toggleDragMode();closeFab()">✥</button></div>
+    <div class="fab-item"><span class="fab-item-lbl">경로 그리기</span><button class="fab-item-btn" id="fab-route" onclick="toggleRouteMode();closeFab()">➕</button></div>
+    <div class="fab-item"><span class="fab-item-lbl">번호 표시</span><button class="fab-item-btn active-tool" id="fab-num" onclick="toggleNums();updateFabStates()">🔢</button></div>
+    <div class="fab-item"><span class="fab-item-lbl">히트맵</span><button class="fab-item-btn" id="fab-heat" onclick="toggleHeatmap();closeFab()">🌡</button></div>
+    <div class="fab-item"><span class="fab-item-lbl">배치 모드</span><button class="fab-item-btn" id="fab-place" onclick="closeFab();togglePlacePicker()">⚡</button></div>
+  </div>
+  <button id="fab-main" onclick="toggleFab()">＋</button>
+</div>
+
 <div id="statusbar">📡 지도 로딩 중…</div>
 
 <script>
@@ -2022,6 +2135,7 @@ function toggleMultiSelect(){
   map.getContainer().classList.add('multi-select-mode');
   updateMultiSelectBtn();
   sb('📦 다중 선택 모드 ON — 마커를 클릭해 선택 후 드래그하면 함께 이동합니다. ESC로 종료.');
+  if(typeof updateFabStates==='function') updateFabStates();
 }
 /* ════════════════════════════════
    【2】 마커 드래그 이동 모드
@@ -2055,6 +2169,7 @@ function toggleDragMode(){
     map.getContainer().style.cursor='';
     sb('✥ 이동 모드 OFF');
   }
+  if(typeof updateFabStates==='function') updateFabStates();
 }
 
 /* ════════════════════════════════
@@ -2738,6 +2853,118 @@ function bulkDelete(){
     document.getElementById('setup-modal').classList.add('hidden');
     loadLocal();
   }
+})();
+
+/* ════════════════════════════════
+   GPS 내 위치
+════════════════════════════════ */
+let gpsMarker = null;
+function goToMyLocation(){
+  const btn = document.getElementById('gps-btn');
+  if(!navigator.geolocation){
+    alert('이 브라우저는 GPS를 지원하지 않아요.\nhttps(ngrok/github.io)로 접속해야 GPS가 동작합니다.');
+    return;
+  }
+  btn.classList.add('locating');
+  btn.textContent = '🔵';
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      const {latitude:lat, longitude:lng} = pos.coords;
+      btn.classList.remove('locating');
+      btn.textContent = '📍';
+      map.setView([lat,lng], 18);
+      if(gpsMarker) map.removeLayer(gpsMarker);
+      gpsMarker = L.circleMarker([lat,lng],{
+        radius:10, fillColor:'#2196F3', color:'#fff',
+        weight:3, fillOpacity:0.9
+      }).addTo(map).bindPopup('📍 현재 내 위치').openPopup();
+      sb('📍 내 위치로 이동했습니다');
+    },
+    err=>{
+      btn.classList.remove('locating');
+      btn.textContent = '📍';
+      const msg = {1:'위치 권한이 거부됐습니다. 브라우저 설정에서 허용해주세요.',2:'위치를 찾을 수 없습니다.',3:'요청 시간이 초과됐습니다.'}[err.code]||'위치 오류';
+      alert('GPS 오류: ' + msg);
+    },
+    {enableHighAccuracy:true, timeout:10000}
+  );
+}
+
+/* ════════════════════════════════
+   모바일 스피드 다이얼 FAB
+════════════════════════════════ */
+let fabOpen = false;
+function toggleFab(){
+  fabOpen = !fabOpen;
+  document.getElementById('fab-main').classList.toggle('open', fabOpen);
+  document.getElementById('fab-items').classList.toggle('open', fabOpen);
+  // 팝업 닫힐때 오버레이도 처리
+  if(!fabOpen){
+    const ov = document.getElementById('mob-overlay');
+    if(ov && ov._fabMode){ ov.classList.remove('show'); ov._fabMode=false; ov.onclick=null; }
+  } else {
+    // FAB 열릴 때 배경 탭하면 닫히도록
+    const ov = document.getElementById('mob-overlay');
+    if(ov){ ov._fabMode=true; ov.classList.add('show'); ov.onclick=()=>closeFab(); }
+  }
+  updateFabStates();
+}
+function closeFab(){
+  fabOpen=false;
+  document.getElementById('fab-main').classList.remove('open');
+  document.getElementById('fab-items').classList.remove('open');
+  const ov = document.getElementById('mob-overlay');
+  if(ov && ov._fabMode){ ov.classList.remove('show'); ov._fabMode=false; ov.onclick=null; }
+}
+function updateFabStates(){
+  // 각 FAB 버튼의 active 상태를 툴바 버튼과 동기화
+  const sync = (fabId, toolId)=>{
+    const f=document.getElementById(fabId);
+    const t=document.getElementById(toolId);
+    if(f&&t) f.classList.toggle('active-tool', t.classList.contains('active-tool'));
+  };
+  sync('fab-drag','drag-btn');
+  sync('fab-multi','multi-sel-btn');
+  sync('fab-route','route-btn');
+  sync('fab-num','num-btn');
+  sync('fab-heat','heat-btn');
+  sync('fab-place','quick-place-btn');
+  const undoBtn=document.getElementById('undo-btn');
+  const fabUndo=document.getElementById('fab-undo');
+  if(fabUndo) fabUndo.disabled = undoBtn ? undoBtn.disabled : true;
+}
+
+/* ════════════════════════════════
+   스와이프로 사이드바 열기/닫기
+════════════════════════════════ */
+(function initSwipe(){
+  let startX=0, startY=0, startTime=0;
+  const SWIPE_THRESHOLD = 60; // px
+  const SWIPE_MAX_Y = 80;     // 세로 흔들림 허용 범위
+  const EDGE_ZONE = 40;       // 왼쪽 가장자리에서만 오른쪽 스와이프 감지 (px)
+
+  document.addEventListener('touchstart', e=>{
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    startTime = Date.now();
+  }, {passive:true});
+
+  document.addEventListener('touchend', e=>{
+    if(window.innerWidth > 768) return;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = Math.abs(e.changedTouches[0].clientY - startY);
+    const dt = Date.now() - startTime;
+    if(dt > 400) return; // 너무 느린 제스처 무시
+
+    // 왼쪽 가장자리에서 오른쪽으로 → 사이드바 열기
+    if(dx > SWIPE_THRESHOLD && dy < SWIPE_MAX_Y && startX < EDGE_ZONE){
+      if(typeof toggleSidebar === 'function') toggleSidebar();
+    }
+    // 어디서든 왼쪽으로 스와이프 → 사이드바 닫기
+    if(dx < -SWIPE_THRESHOLD && dy < SWIPE_MAX_Y){
+      if(typeof closeSidebarMobile === 'function') closeSidebarMobile();
+    }
+  }, {passive:true});
 })();
 
 /* ════════════════════════════════
