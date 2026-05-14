@@ -9,6 +9,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
@@ -185,10 +187,107 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
 .pp-item:hover{background:#f0f5ff}
 .pp-item.pp-sel{background:#e8f1fd;color:#1a4f8a}
 .pp-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* ── 라인 목록 ── */
+.line-item{display:flex;align-items:center;gap:6px;padding:5px 7px;border-radius:6px;font-size:11px;background:#f7f8fa;margin-bottom:4px;border:0.5px solid #e2e8f0}
+.line-dot{width:22px;height:4px;border-radius:2px;flex-shrink:0}
+.line-lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#444}
+.line-del{background:none;border:none;cursor:pointer;font-size:13px;padding:1px 4px;color:#ccc;border-radius:4px;flex-shrink:0}
+.line-del:hover{color:#dc3545;background:#fff0f0}
+/* ── 다중 선택 모드 ── */
+.multi-select-mode .leaflet-marker-icon{cursor:cell!important}
+.multi-sel-ring{
+  position:absolute;inset:-6px;border-radius:50%;
+  border:3px solid #FF6B35;
+  animation:selPulse 0.8s ease-in-out infinite alternate;
+  pointer-events:none;z-index:1;
+}
+@keyframes selPulse{
+  from{opacity:.6;transform:scale(1)}
+  to{opacity:1;transform:scale(1.25)}
+}
+/* ── 구역 프리셋 버튼 ── */
+.zone-preset-row{display:flex;gap:5px;margin-bottom:8px}
+.zone-preset-btn{flex:1;padding:7px 4px;border-radius:7px;border:none;cursor:pointer;font-size:11px;font-weight:700;color:#fff;text-align:center;transition:opacity .15s}
+.zone-preset-btn:hover{opacity:.85}
+/* ── 굵기 버튼 ── */
+.pw-btn{flex:1;padding:4px 2px;border-radius:6px;border:1.5px solid #dde3ea;background:#f7f8fa;font-size:10px;font-weight:700;cursor:pointer;color:#555;transition:all .15s}
+.pw-btn:hover{border-color:#2e7dd1;color:#1a4f8a}
+.pw-btn-active{background:#1a4f8a;color:#fff;border-color:#1a4f8a}
+
+/* ── 필터바 ── */
+.filter-bar{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
+.filter-bar select{flex:1;min-width:70px;font-size:11px;padding:4px 5px;border:1px solid #ccd3db;border-radius:6px;background:#fff;font-family:inherit}
+/* ── 일괄편집 ── */
+.bulk-bar{background:#fff8e1;border:1px solid #FFB300;border-radius:8px;padding:8px 10px;margin-bottom:8px;display:none}
+.bulk-bar.show{display:block}
+.bulk-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.mcard-check{position:absolute;top:6px;right:6px;width:16px;height:16px;cursor:pointer;display:none}
+.mcard{position:relative}
+.bulk-mode .mcard-check{display:block}
+/* ── 수정 모달 ── */
+#edit-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:19999;display:flex;align-items:center;justify-content:center}
+#edit-modal.hidden{display:none}
+.edit-box{background:#fff;border-radius:14px;padding:20px;width:340px;max-width:94vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.edit-box h3{font-size:15px;color:#1a4f8a;margin-bottom:12px}
+/* ── 사진 첨부 ── */
+.photo-strip{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.photo-thumb{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid #dde3ea;cursor:pointer}
+.photo-add{width:64px;height:64px;border:1.5px dashed #ccd3db;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;color:#aaa;background:#fafafa}
+.photo-add:hover{border-color:#2e7dd1;color:#2e7dd1}
+/* ── 구역 뱃지 ── */
+.zone-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;margin-right:4px}
+/* ── 통계 구역별 ── */
+.zone-stat-hd{font-size:12px;font-weight:700;margin:10px 0 5px;padding:5px 8px;border-radius:6px;color:#fff}
+/* ── 히트맵 버튼 ── */
 </style>
 </head>
 <body>
 
+
+<!-- ══════════ 수정 모달 ══════════ -->
+<div id="edit-modal" class="hidden">
+  <div class="edit-box">
+    <h3>✏️ 업소 정보 수정</h3>
+    <input type="hidden" id="em-id">
+    <div class="fg"><label>업소명 *</label><input id="em-name" placeholder="예) 제주 해장국"></div>
+    <div class="fg"><label>카테고리</label>
+      <select id="em-cat"></select>
+    </div>
+    <div class="fg"><label>구역</label>
+      <select id="em-zone">
+        <option value="main">🔴 메인거리</option>
+        <option value="gwanduk">🔵 관덕정</option>
+        <option value="sanjicheon">🟢 산지천</option>
+        <option value="etc">⚪ 기타</option>
+      </select>
+    </div>
+    <div class="fg"><label>상세 업종</label><input id="em-type" placeholder="예) 한식, 편의점"></div>
+    <div class="fg"><label>층수 / 위치</label><input id="em-floor" placeholder="예) 1층, 지하"></div>
+    <div class="fg"><label>영업 상태</label>
+      <select id="em-status">
+        <option>영업중</option><option>폐업</option><option>빈 점포</option><option>공사중</option><option>미확인</option>
+      </select>
+    </div>
+    <div class="fg"><label>주소</label>
+      <div style="display:flex;gap:6px">
+        <input id="em-addr" placeholder="자동입력 또는 직접 입력" style="flex:1">
+        <button type="button" id="em-addr-btn" onclick="lookupEditAddr()" style="padding:0 10px;background:#1976d2;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap">🔍 조회</button>
+      </div>
+      <div id="em-addr-msg" style="font-size:11px;color:#888;margin-top:2px"></div>
+    </div>
+    <div class="fg"><label>메모</label><textarea id="em-memo" rows="2" placeholder="특이사항…"></textarea></div>
+    <div class="fg">
+      <label>사진 첨부 (최대 3장)</label>
+      <div class="photo-strip" id="em-photos"></div>
+      <input type="file" id="em-photo-inp" accept="image/*" style="display:none" onchange="addPhoto(event)">
+    </div>
+    <div style="display:flex;gap:6px;margin-top:12px">
+      <button class="btn btn-p" style="flex:2" onclick="saveEditModal()">💾 저장</button>
+      <button class="btn btn-s" style="flex:1" onclick="closeEditModal()">취소</button>
+    </div>
+  </div>
+</div>
 <!-- ══════════ 설정 모달 ══════════ -->
 <div id="setup-modal" class="modal-overlay">
   <div class="modal-box">
@@ -272,6 +371,30 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
   <!-- 탭1: 구역 -->
   <div class="tab-panel" id="tp1">
     <div class="sec">구역 · 경로 표시</div>
+    <div style="margin-bottom:8px">
+      <div style="font-size:10px;color:#888;font-weight:700;margin-bottom:5px">⚡ 구역 프리셋 (클릭 → 바로 그리기 시작)</div>
+      <div class="zone-preset-row">
+        <button class="zone-preset-btn" style="background:#e63946" onclick="setZonePreset('#e63946','메인거리')">🔴 메인거리</button>
+        <button class="zone-preset-btn" style="background:#2196F3" onclick="setZonePreset('#2196F3','관덕정')">🔵 관덕정</button>
+        <button class="zone-preset-btn" style="background:#4CAF50" onclick="setZonePreset('#4CAF50','산지천')">🟢 산지천</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;margin-top:5px">
+        <span style="font-size:10px;color:#999;white-space:nowrap">굵기</span>
+        <button id="pw-btn-2" class="pw-btn" onclick="setPresetWeight(2)">얇게</button>
+        <button id="pw-btn-4" class="pw-btn pw-btn-active" onclick="setPresetWeight(4)">보통</button>
+        <button id="pw-btn-6" class="pw-btn" onclick="setPresetWeight(6)">굵게</button>
+        <button id="pw-btn-9" class="pw-btn" onclick="setPresetWeight(9)">매우굵게</button>
+      </div>
+      <!-- 그리기 진행 중 상태바 -->
+      <div id="draw-active-bar" style="display:none;background:#fff8e1;border:1.5px solid #FFB300;border-radius:8px;padding:8px 10px;margin-top:6px">
+        <div style="font-size:11px;font-weight:700;color:#E65100;margin-bottom:6px" id="draw-active-label">✏️ 그리는 중…</div>
+        <div style="font-size:10px;color:#888;margin-bottom:7px">지도를 클릭해 점을 추가하세요</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-p" style="flex:2;font-size:12px;padding:6px 0" onclick="finishDraw()">✅ 완료</button>
+          <button class="btn btn-s" style="flex:1;font-size:12px;padding:6px 0" onclick="cancelDraw()">✕ 취소</button>
+        </div>
+      </div>
+    </div>
     <div style="background:#f7f8fa;border-radius:8px;padding:9px;margin-bottom:10px">
       <div class="leg-row"><div class="leg-line" style="background:#e63946"></div>조사 경계</div>
       <div class="leg-row"><div class="leg-line" style="background:#2196F3"></div>이동 경로</div>
@@ -296,7 +419,9 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
       <button class="btn btn-g" style="flex:1" onclick="startPoly()">⬡ 폴리곤</button>
     </div>
     <button class="btn btn-r btn-sm" onclick="clearLines()">라인 전체 삭제</button>
-    <p style="font-size:11px;color:#999;margin-top:8px">더블클릭 또는 첫 점 클릭으로 완료</p>
+    <p style="font-size:11px;color:#999;margin-top:6px">더블클릭 또는 ✅ 완료 버튼으로 완료</p>
+    <!-- 그려진 라인 목록 -->
+    <div id="lines-list" style="margin-top:8px"></div>
 
     <!-- 경로 그리기 섹션 -->
     <div class="route-section">
@@ -326,25 +451,61 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
 
   <!-- 탭2: 목록 -->
   <div class="tab-panel" id="tp2">
-    <div class="sec">등록 업소 목록</div>
-    <div class="fg" style="margin-bottom:6px"><input id="srch" placeholder="🔍 업소명 검색…" oninput="filterList()" style="border-radius:8px"></div>
-    <!-- 검색 결과 (검색어 있을 때만 표시) -->
+    <div class="fg" style="margin-bottom:4px"><input id="srch" placeholder="🔍 업소명 검색…" oninput="filterList()" style="border-radius:8px"></div>
+    <!-- 복합 필터 -->
+    <div class="filter-bar">
+      <select id="flt-zone" onchange="filterList()">
+        <option value="">전체 구역</option>
+        <option value="main">🔴 메인거리</option>
+        <option value="gwanduk">🔵 관덕정</option>
+        <option value="sanjicheon">🟢 산지천</option>
+        <option value="etc">⚪ 기타</option>
+      </select>
+      <select id="flt-status" onchange="filterList()">
+        <option value="">전체 상태</option>
+        <option>영업중</option><option>폐업</option><option>빈 점포</option><option>공사중</option><option>미확인</option>
+      </select>
+      <select id="flt-cat" onchange="filterList()">
+        <option value="">전체 업종</option>
+      </select>
+    </div>
+    <!-- 일괄편집 바 -->
+    <div class="bulk-bar" id="bulk-bar">
+      <div style="font-size:11px;font-weight:700;color:#E65100" id="bulk-count">0개 선택</div>
+      <div class="bulk-actions">
+        <select id="bulk-status-sel" style="font-size:11px;padding:3px 5px;border:1px solid #ccd3db;border-radius:5px;font-family:inherit">
+          <option value="">상태 변경…</option>
+          <option>영업중</option><option>폐업</option><option>빈 점포</option><option>공사중</option><option>미확인</option>
+        </select>
+        <button class="btn btn-p btn-sm" onclick="applyBulkStatus()">✅ 적용</button>
+        <button class="btn btn-s btn-sm" onclick="selectAllFiltered()">전체선택</button>
+        <button class="btn btn-r btn-sm" onclick="bulkDelete()">🗑 삭제</button>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+      <button class="btn btn-s btn-sm" id="bulk-toggle-btn" onclick="toggleBulkMode()">☑ 일괄편집</button>
+    </div>
     <div id="mlist-search" style="display:none"></div>
-    <!-- 카테고리 아코디언 (기본 표시) -->
     <div id="mlist-acc"></div>
   </div>
 
   <!-- 탭3: 통계 -->
   <div class="tab-panel" id="tp3">
-    <div class="sec">현황 통계</div>
+    <div class="sec">전체 현황</div>
     <div class="sg" id="sg"></div>
+    <div class="sec" style="margin-top:8px">구역별 통계</div>
+    <div id="zone-stats"></div>
     <div class="sec" style="margin-top:8px">카테고리 분포</div>
     <div id="schart"></div>
-    <div class="sec" style="margin-top:10px">데이터</div>
+    <div class="sec" style="margin-top:10px">내보내기</div>
+    <div class="row" style="margin-bottom:6px">
+      <button class="btn btn-g btn-sm" onclick="exportExcel()" style="flex:1">📊 엑셀</button>
+      <button class="btn btn-s btn-sm" onclick="exportCSV()" style="flex:1">📄 CSV</button>
+      <button class="btn btn-s btn-sm" onclick="exportJSON()" style="flex:1">💾 JSON</button>
+    </div>
     <div class="row">
-      <button class="btn btn-g btn-sm" onclick="exportJSON()">💾 JSON 저장</button>
-      <button class="btn btn-s btn-sm" onclick="triggerImport()">📂 불러오기</button>
-      <button class="btn btn-r btn-sm" onclick="clearAll()">🗑 전체삭제</button>
+      <button class="btn btn-s btn-sm" onclick="triggerImport()" style="flex:1">📂 불러오기</button>
+      <button class="btn btn-r btn-sm" onclick="clearAll()" style="flex:1">🗑 전체삭제</button>
     </div>
     <input type="file" id="imp-file" accept=".json" style="display:none" onchange="importJSON(event)">
   </div>
@@ -416,6 +577,9 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
       ↩ 뒤로
     </button>
     <!-- 마커 이동 모드 -->
+    <button class="map-tool-btn" id="multi-sel-btn" onclick="toggleMultiSelect()" title="여러 마커를 선택해서 한번에 이동">
+      📦 다중 선택
+    </button>
     <button class="map-tool-btn" id="drag-btn" onclick="toggleDragMode()" title="마커를 드래그해서 위치 수정">
       ✥ 이동 모드
     </button>
@@ -430,6 +594,9 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
     <!-- 통합 빠른 배치 버튼 -->
     <button class="map-tool-btn" id="quick-place-btn" onclick="togglePlacePicker()" title="원하는 카테고리 선택 후 클릭만으로 즉시 배치">
       ⚡ 배치 모드
+    </button>
+    <button class="map-tool-btn" id="heat-btn" onclick="toggleHeatmap()" title="공실·폐업 밀집도 히트맵">
+      🌡 히트맵
     </button>
   </div>
 
@@ -458,6 +625,36 @@ const CATS = [
   {id:'reside',   lbl:'거주',      color:'#1565C0', ico:'🏠', code:'ㅈ'},
   {id:'center',   lbl:'센터',      color:'#00897B', ico:'🏛', code:'ㅅ'},
 ];
+
+const ZONES = [
+  {id:'main',       lbl:'메인거리', color:'#e63946',
+   bounds:{minLat:33.5140,maxLat:33.5185,minLng:33.5140,maxLng2:126.5265, minLng2:126.5210}},
+  {id:'gwanduk',    lbl:'관덕정',   color:'#2196F3',
+   bounds:{minLat:33.5138,maxLat:33.5168,minLng:126.5195,maxLng:126.5228}},
+  {id:'sanjicheon', lbl:'산지천',   color:'#4CAF50',
+   bounds:{minLat:33.5125,maxLat:33.5158,minLng:126.5236,maxLng:126.5285}},
+  {id:'etc',        lbl:'기타',     color:'#9E9E9E',
+   bounds:null},
+];
+// id 범위 기반 구역 (초기 데이터)
+const ZONE_ID_MAP = {main:[1,82], gwanduk:[83,151], sanjicheon:[152,243]};
+
+function detectZone(lat, lng, id){
+  // id 범위로 우선 판단 (초기 데이터)
+  if(id){
+    for(const [zid,[lo,hi]] of Object.entries(ZONE_ID_MAP)){
+      if(id>=lo && id<=hi) return zid;
+    }
+  }
+  // 좌표 범위로 판단
+  if(lng>=126.5195 && lng<=126.5228 && lat>=33.5138 && lat<=33.5168) return 'gwanduk';
+  if(lng>=126.5236 && lng<=126.5285 && lat>=33.5125 && lat<=33.5158) return 'sanjicheon';
+  if(lng>=126.5210 && lng<=126.5265 && lat>=33.5140 && lat<=33.5185) return 'main';
+  return 'etc';
+}
+function zoneLbl(zid){ return ZONES.find(z=>z.id===zid)?.lbl || '기타'; }
+function zoneColor(zid){ return ZONES.find(z=>z.id===zid)?.color || '#9E9E9E'; }
+
 
 // ════════════════════════════════════════════════════════
 // 현장 조사 데이터 — 제주시 중앙로 일대 (최종 243개)
@@ -775,6 +972,23 @@ let hiddenCats = new Set();
 // ── 번호 배지 표시 여부 ──
 let showNums = true;
 
+
+
+// ── 복합 필터 ──
+let filterZone='', filterStatus='', filterCat='';
+// ── 일괄편집 ──
+let isBulkMode=false;
+const bulkSelected=new Set();
+// ── 히트맵 ──
+let heatLayer=null;
+let isHeatOn=false;
+// ── 사진 편집 임시 ──
+let _editPhotos=[];
+// ── 다중 마커 선택 이동 모드 ──
+let isMultiSelect = false;
+let selectedMarkers = new Set();   // 선택된 마커 id 집합
+let _msStartLL = null;             // 드래그 시작 위치
+let _msStartPos = {};              // 선택된 마커들의 시작 좌표
 // ── 경로(십자선) 그리기 모드 ──
 let isRouteMode  = false;
 let routePts     = [];      // LatLng 배열
@@ -826,6 +1040,7 @@ function goTab(n){
   }
   if(n===3) drawStats();
   if(n===2) drawList();
+  if(n===1) drawLinesList();
   if(n===4) genQR();
 }
 
@@ -982,8 +1197,11 @@ map.on('click',e=>{
     const name = `${cat.lbl}-${quickPlaceCount}`;
     const defaultStatus = cat.id==='vacant' ? '빈 점포' : cat.id==='reside' ? '영업중' : '영업중';
     const id   = nid++;
-    const lf   = mkMarker(e.latlng, cat, id, name, '', '', defaultStatus, '');
-    markers.push({id, lat:e.latlng.lat, lng:e.latlng.lng, cat:cat.id, name, type:'', floor:'', status:defaultStatus, memo:'', leaflet:lf});
+    const zone = detectZone(e.latlng.lat, e.latlng.lng, id);
+    const lf   = mkMarker(e.latlng, cat, id, name, '', '', defaultStatus, '', zone, '', []);
+    const mObj = {id, lat:e.latlng.lat, lng:e.latlng.lng, cat:cat.id, name, type:'', floor:'', status:defaultStatus, memo:'', zone, addr:'', photos:[], leaflet:lf};
+    markers.push(mObj);
+    fetchAddr(mObj);
     pushHistory({type:'add', id});
     persist(); drawCats(); drawList();
     sb(`⚡ ${cat.ico} ${name} 추가 (총 ${quickPlaceCount}개)`);
@@ -1009,8 +1227,9 @@ function saveMarker(){
   const memo  = document.getElementById('fm').value.trim();
   const cat   = CATS.find(c=>c.id===selCat);
   const id    = nid++;
-  const lf    = mkMarker(pendLL,cat,id,name,type,floor,stat,memo);
-  const mObj = {id,lat:pendLL.lat,lng:pendLL.lng,cat:cat.id,name,type,floor,status:stat,memo,leaflet:lf};
+  const zone  = detectZone(pendLL.lat, pendLL.lng, id);
+  const lf    = mkMarker(pendLL,cat,id,name,type,floor,stat,memo,zone,'', []);
+  const mObj  = {id,lat:pendLL.lat,lng:pendLL.lng,cat:cat.id,name,type,floor,status:stat,memo,zone,addr:'',photos:[],leaflet:lf};
   markers.push(mObj);
   pushHistory({type:'add', id});
   pendLL=null;
@@ -1018,6 +1237,7 @@ function saveMarker(){
   document.getElementById('mode-txt').textContent=`${cat.ico} ${cat.lbl} — 지도를 클릭하세요`;
   persist(); drawCats();
   sb(`✅ "${name}" 저장됨`);
+  fetchAddr(mObj); // 비동기 주소 조회
 }
 
 /* ════════════════════════════════
@@ -1025,30 +1245,39 @@ function saveMarker(){
 ════════════════════════════════ */
 const STATUS_COL={'영업중':'#28a745','폐업':'#dc3545','빈 점포':'#6c757d','공사중':'#fd7e14','미확인':'#aaa'};
 
-function mkPopupHTML(cat,id,name,type,floor,status,memo){
+function mkPopupHTML(cat,id,name,type,floor,status,memo,zone,addr,photos){
+  const zc=zoneColor(zone); const zl=zoneLbl(zone);
+  const photoHtml=(photos||[]).map(p=>`<img src="${p}" style="width:54px;height:40px;object-fit:cover;border-radius:4px;margin-right:3px;cursor:pointer" onclick="viewPhoto('${p}')">`).join('');
+  const addrHtml=addr?`<br><b>주소:</b> <span style="font-size:10px">${addr}</span>`:'';
   return `
     <div style="font-size:14px;font-weight:700;margin-bottom:4px">${name}</div>
-    <span style="background:${cat.color};color:#fff;padding:2px 9px;border-radius:12px;font-size:11px">${cat.ico} [${cat.code}] ${cat.lbl}</span>
-    <div style="font-size:12px;color:#555;margin-top:6px">
+    <span style="background:${cat.color};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px">${cat.ico} ${cat.lbl}</span>
+    <span style="background:${zc};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:3px">${zl}</span>
+    <div style="font-size:12px;color:#555;margin-top:5px">
       ${type?`<b>업종:</b> ${type}<br>`:''}
       ${floor?`<b>위치:</b> ${floor}<br>`:''}
       <b>상태:</b> <span style="color:${STATUS_COL[status]||'#aaa'};font-weight:700">${status}</span>
+      ${addrHtml}
       ${memo?`<br><b>메모:</b> ${memo}`:''}
     </div>
+    ${photoHtml?`<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px">${photoHtml}</div>`:''}
     <div style="margin-top:8px;display:flex;gap:6px">
       <button onclick="editM(${id})" style="font-size:11px;padding:3px 8px;border-radius:5px;background:#2e7dd1;color:#fff;border:none;cursor:pointer">✏️ 수정</button>
       <button onclick="delM(${id})" style="font-size:11px;padding:3px 8px;border-radius:5px;background:#dc3545;color:#fff;border:none;cursor:pointer">🗑 삭제</button>
     </div>`;
 }
+function viewPhoto(src){ window.open(src,'_blank'); }
 
-function makeIcon(cat, status, num){
+function makeIcon(cat, status, num, selected=false){
   const sc = status==='빈 점포'?'#ADB5BD':status==='폐업'?'#dc3545':cat.color;
   const numBadge = num!=null
     ? `<div style="position:absolute;top:-6px;right:-6px;background:#333;color:#fff;border-radius:8px;font-size:9px;font-weight:900;padding:1px 4px;line-height:1.4;border:1px solid #fff;white-space:nowrap">${num}</div>`
     : '';
+  const selRing = selected ? `<div class="multi-sel-ring" style="border-color:${cat.color}"></div>` : '';
   return L.divIcon({
     className:'',
     html:`<div style="position:relative;display:inline-block">
+      ${selRing}
       <div style="background:${sc};color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;border:2px solid rgba(0,0,0,.2);box-shadow:0 2px 6px rgba(0,0,0,.3);cursor:inherit">${cat.ico}</div>
       ${numBadge}
     </div>`,
@@ -1064,7 +1293,7 @@ function refreshNums(){
     catCount[mk.cat]=(catCount[mk.cat]||0)+1;
     mk.num=catCount[mk.cat];
     const cat=CATS.find(c=>c.id===mk.cat);
-    if(cat && mk.leaflet) mk.leaflet.setIcon(makeIcon(cat, mk.status, showNums ? mk.num : null));
+    if(cat && mk.leaflet) mk.leaflet.setIcon(makeIcon(cat, mk.status, showNums ? mk.num : null, selectedMarkers.has(mk.id)));
   });
 }
 
@@ -1076,22 +1305,85 @@ function toggleNums(){
   refreshNums();
 }
 
-function mkMarker(ll,cat,id,name,type,floor,status,memo){
+function mkMarker(ll,cat,id,name,type,floor,status,memo,zone,addr,photos){
   const icon = makeIcon(cat, status, null); // 번호는 refreshNums()에서 설정
   const m = L.marker(ll,{icon, draggable:false}).addTo(map)
-              .bindPopup(L.popup({maxWidth:230}).setContent(mkPopupHTML(cat,id,name,type,floor,status,memo)));
+              .bindPopup(L.popup({maxWidth:260}).setContent(mkPopupHTML(cat,id,name,type,floor,status,memo,zone,addr,photos)));
   if(hiddenCats.has(cat.id)) m.setOpacity(0);
 
-  // 드래그 완료 → 좌표 업데이트 + 히스토리
+  // 팝업 열릴 때 주소 없으면 자동 조회
+  m.on('popupopen', function(){
+    const mk = markers.find(x=>x.leaflet===m);
+    if(mk && !mk.addr) fetchAddr(mk);
+  });
+
+  // 드래그 모드 중 팝업 열림 방지
+  m.on('click', function(e){
+    if(isDragMode){
+      L.DomEvent.stopPropagation(e);
+      m.closePopup();
+    }
+  });
+
+  // 다중 선택 모드: 클릭으로 선택 토글
+  m.on('click', function(e){
+    if(!isMultiSelect) return;
+    L.DomEvent.stopPropagation(e);
+    const mk = markers.find(x=>x.leaflet===m);
+    if(!mk) return;
+    if(selectedMarkers.has(mk.id)) selectedMarkers.delete(mk.id);
+    else selectedMarkers.add(mk.id);
+    const cat = CATS.find(c=>c.id===mk.cat);
+    mk.leaflet.setIcon(makeIcon(cat, mk.status, showNums ? mk.num : null, selectedMarkers.has(mk.id)));
+    updateMultiSelectBtn();
+    sb(`📦 ${selectedMarkers.size}개 마커 선택됨 — 선택된 마커를 드래그하면 함께 이동합니다`);
+  });
+
+  // 단일 드래그 완료 (단순 이동 모드)
+  m.on('dragstart', function(){
+    const mk = markers.find(x=>x.leaflet===m);
+    if(!mk || !isMultiSelect || !selectedMarkers.has(mk.id)) return;
+    // 다중선택 드래그 시작: 모든 선택 마커의 시작 위치 기록
+    _msStartLL = m.getLatLng();
+    _msStartPos = {};
+    selectedMarkers.forEach(id=>{
+      const sel = markers.find(x=>x.id===id);
+      if(sel){ const ll=sel.leaflet.getLatLng(); _msStartPos[id]={lat:ll.lat,lng:ll.lng}; }
+    });
+  });
+  m.on('drag', function(){
+    const mk = markers.find(x=>x.leaflet===m);
+    if(!mk || !isMultiSelect || !selectedMarkers.has(mk.id) || !_msStartLL) return;
+    const cur = m.getLatLng();
+    const dLat = cur.lat - _msStartLL.lat;
+    const dLng = cur.lng - _msStartLL.lng;
+    selectedMarkers.forEach(id=>{
+      if(id===mk.id) return;
+      const sel=markers.find(x=>x.id===id);
+      const orig=_msStartPos[id];
+      if(sel&&orig) sel.leaflet.setLatLng([orig.lat+dLat, orig.lng+dLng]);
+    });
+  });
   m.on('dragend', function(e){
     const mk = markers.find(x=>x.leaflet===m);
     if(!mk) return;
-    const newLL = e.target.getLatLng();
-    pushHistory({type:'move', id:mk.id, oldLat:mk.lat, oldLng:mk.lng, newLat:newLL.lat, newLng:newLL.lng});
-    mk.lat = newLL.lat;
-    mk.lng = newLL.lng;
-    persist();
-    sb(`📍 "${mk.name}" 위치 수정됨`);
+    if(isMultiSelect && selectedMarkers.has(mk.id)){
+      // 다중선택 이동: 모든 선택 마커 위치 저장
+      selectedMarkers.forEach(id=>{
+        const sel=markers.find(x=>x.id===id);
+        if(sel){ const ll=sel.leaflet.getLatLng(); sel.lat=ll.lat; sel.lng=ll.lng; }
+      });
+      _msStartLL=null; _msStartPos={};
+      persist();
+      sb(`📦 ${selectedMarkers.size}개 마커 이동 완료`);
+    } else {
+      // 단일 이동 모드
+      const newLL = e.target.getLatLng();
+      pushHistory({type:'move', id:mk.id, oldLat:mk.lat, oldLng:mk.lng, newLat:newLL.lat, newLng:newLL.lng});
+      mk.lat = newLL.lat; mk.lng = newLL.lng;
+      persist();
+      sb(`📍 "${mk.name}" 위치 수정됨`);
+    }
   });
   return m;
 }
@@ -1107,23 +1399,137 @@ function delM(id){
   sb('🗑 삭제됨');
 }
 
+function lookupEditAddr(){
+  const id=document.getElementById('em-id').value;
+  const m=markers.find(m=>m.id==id); if(!m) return;
+  const btn=document.getElementById('em-addr-btn');
+  const msg=document.getElementById('em-addr-msg');
+  const addrEl=document.getElementById('em-addr');
+  btn.disabled=true; btn.textContent='조회 중...';
+  msg.textContent=''; msg.style.color='#888';
+  // 카카오 프록시 서버 경유 (proxy_server.py 실행 필요)
+  fetch(`/kakao-geocode?x=${m.lng}&y=${m.lat}`)
+    .then(r=>r.json()).then(d=>{
+      if(d.documents && d.documents.length>0){
+        const doc=d.documents[0];
+        const addr=doc.road_address?.address_name||doc.address?.address_name||'';
+        if(addr){
+          m.addr=addr;
+          addrEl.value=addr;
+          msg.textContent='✅ 카카오 주소 조회 성공';
+          msg.style.color='#28a745';
+        } else {
+          msg.textContent='⚠️ 주소를 찾지 못했습니다';
+          msg.style.color='#fd7e14';
+        }
+      } else {
+        const errDetail = d.error ? ` (${d.error})` : '';
+        msg.textContent=`⚠️ 카카오 API 오류${errDetail}`;
+        msg.style.color='#fd7e14';
+      }
+    }).catch(err=>{
+      msg.textContent='❌ 서버 미연결 — 서버_시작.bat을 먼저 실행하세요';
+      msg.style.color='#dc3545';
+    }).finally(()=>{
+      btn.disabled=false; btn.textContent='🔍 조회';
+    });
+}
+
 function editM(id){
   const m=markers.find(m=>m.id===id); if(!m)return;
-  const name=prompt('업소명:',m.name); if(name===null)return;
-  const type=prompt('상세 업종:',m.type);
-  const floor=prompt('층수/위치:',m.floor);
-  const stat=prompt('상태 (영업중/폐업/빈 점포/공사중/미확인):',m.status);
-  const memo=prompt('메모:',m.memo);
-  m.name=name||m.name;
-  if(type!==null)m.type=type;
-  if(floor!==null)m.floor=floor;
-  if(['영업중','폐업','빈 점포','공사중','미확인'].includes(stat))m.status=stat;
-  if(memo!==null)m.memo=memo;
+  const cat=CATS.find(c=>c.id===m.cat);
+  document.getElementById('em-id').value=id;
+  document.getElementById('em-name').value=m.name;
+  document.getElementById('em-type').value=m.type||'';
+  document.getElementById('em-floor').value=m.floor||'';
+  document.getElementById('em-status').value=m.status||'영업중';
+  document.getElementById('em-addr').value=m.addr||'';
+  document.getElementById('em-memo').value=m.memo||'';
+  document.getElementById('em-zone').value=m.zone||detectZone(m.lat,m.lng,m.id);
+  // 주소 없으면 수정창 열릴 때 카카오로 자동 조회
+  if(!m.addr){
+    const addrEl=document.getElementById('em-addr');
+    addrEl.placeholder='조회 중...';
+    fetch(`/kakao-geocode?x=${m.lng}&y=${m.lat}`)
+      .then(r=>r.json()).then(d=>{
+        if(d.documents && d.documents.length>0){
+          const doc=d.documents[0];
+          const addr=doc.road_address?.address_name||doc.address?.address_name||'';
+          m.addr=addr;
+          addrEl.value=addr;
+        }
+        addrEl.placeholder='자동입력 또는 직접 입력';
+      }).catch(()=>{ addrEl.placeholder='자동입력 또는 직접 입력'; });
+  }
+  // 카테고리 옵션 생성
+  const catSel=document.getElementById('em-cat');
+  catSel.innerHTML=CATS.map(c=>`<option value="${c.id}"${c.id===m.cat?' selected':''}>${c.ico} ${c.lbl}</option>`).join('');
+  // 사진 렌더
+  _editPhotos=[...(m.photos||[])];
+  renderEditPhotos();
+  document.getElementById('edit-modal').classList.remove('hidden');
+}
+function renderEditPhotos(){
+  const strip=document.getElementById('em-photos');
+  strip.innerHTML='';
+  _editPhotos.forEach((p,i)=>{
+    const img=document.createElement('img');
+    img.src=p; img.className='photo-thumb';
+    img.title='클릭해서 삭제'; img.onclick=()=>{ _editPhotos.splice(i,1); renderEditPhotos(); };
+    strip.appendChild(img);
+  });
+  if(_editPhotos.length<3){
+    const add=document.createElement('div');
+    add.className='photo-add'; add.textContent='+';
+    add.onclick=()=>document.getElementById('em-photo-inp').click();
+    strip.appendChild(add);
+  }
+}
+function addPhoto(e){
+  const file=e.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const MAX=400;
+      let w=img.width, h=img.height;
+      if(w>h&&w>MAX){h=h*MAX/w;w=MAX;}
+      else if(h>MAX){w=w*MAX/h;h=MAX;}
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      _editPhotos.push(canvas.toDataURL('image/jpeg',0.65));
+      renderEditPhotos();
+    };
+    img.src=ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  e.target.value='';
+}
+function saveEditModal(){
+  const id=+document.getElementById('em-id').value;
+  const m=markers.find(m=>m.id===id); if(!m)return;
+  m.name=document.getElementById('em-name').value.trim()||m.name;
+  m.type=document.getElementById('em-type').value.trim();
+  m.floor=document.getElementById('em-floor').value.trim();
+  m.status=document.getElementById('em-status').value;
+  m.addr=document.getElementById('em-addr').value.trim();
+  m.memo=document.getElementById('em-memo').value.trim();
+  m.zone=document.getElementById('em-zone').value;
+  m.cat=document.getElementById('em-cat').value;
+  m.photos=[..._editPhotos];
   map.removeLayer(m.leaflet);
   const cat=CATS.find(c=>c.id===m.cat);
-  m.leaflet=mkMarker({lat:m.lat,lng:m.lng},cat,m.id,m.name,m.type,m.floor,m.status,m.memo);
-  persist(); drawCats(); drawList();
+  m.leaflet=mkMarker({lat:m.lat,lng:m.lng},cat,m.id,m.name,m.type,m.floor,m.status,m.memo,m.zone,m.addr,m.photos);
+  if(hiddenCats.has(cat.id)) m.leaflet.setOpacity(0);
+  closeEditModal();
+  persist(); drawCats(); drawList(); refreshNums();
+  if(isHeatOn){ toggleHeatmap(); toggleHeatmap(); }
   sb(`✅ "${m.name}" 수정됨`);
+}
+function closeEditModal(){
+  document.getElementById('edit-modal').classList.add('hidden');
+  _editPhotos=[];
 }
 
 /* ════════════════════════════════
@@ -1135,9 +1541,11 @@ const accOpen = {};
 function mkMcard(m, cat){
   const d = document.createElement('div');
   d.className='mcard'; d.style.borderLeftColor=cat.color;
-  d.innerHTML=`
-    <div class="mc-name">${cat.ico} ${m.name}</div>
-    <div class="mc-meta">${cat.lbl}${m.type?' · '+m.type:''} · ${m.status}</div>
+  const zc=zoneColor(m.zone); const zl=zoneLbl(m.zone);
+  const chk=isBulkMode?`<input type="checkbox" class="mcard-check" ${bulkSelected.has(m.id)?'checked':''} onchange="toggleBulkItem(${m.id},this.checked)">`:'';
+  d.innerHTML=`${chk}
+    <div class="mc-name">${cat.ico} ${m.name} <span style="background:${zc};color:#fff;font-size:9px;padding:1px 5px;border-radius:6px;font-weight:700">${zl}</span></div>
+    <div class="mc-meta">${cat.lbl}${m.type?' · '+m.type:''} · ${m.status}${m.addr?' · <span style="font-size:10px;color:#888">'+m.addr+'</span>':''}</div>
     <div class="mc-btns">
       <button class="btn btn-p btn-sm" onclick="flyTo(${m.id})">🎯</button>
       <button class="btn btn-s btn-sm" onclick="editM(${m.id})">✏️</button>
@@ -1146,58 +1554,64 @@ function mkMcard(m, cat){
   return d;
 }
 
+function getFilteredMarkers(){
+  const f=(document.getElementById('srch')?.value||'').toLowerCase().trim();
+  const fz=document.getElementById('flt-zone')?.value||'';
+  const fs=document.getElementById('flt-status')?.value||'';
+  const fc=document.getElementById('flt-cat')?.value||'';
+  return markers.filter(m=>{
+    if(fz && m.zone!==fz) return false;
+    if(fs && m.status!==fs) return false;
+    if(fc && m.cat!==fc) return false;
+    if(f && !m.name.toLowerCase().includes(f) && !(m.type||'').toLowerCase().includes(f)) return false;
+    return true;
+  });
+}
 function drawList(){
   const accEl = document.getElementById('mlist-acc');
   const srchEl = document.getElementById('mlist-search');
   const f = (document.getElementById('srch')?.value||'').trim();
+  const fz = document.getElementById('flt-zone')?.value||'';
+  const fs = document.getElementById('flt-status')?.value||'';
+  const fc = document.getElementById('flt-cat')?.value||'';
+  const hasFilter = f||fz||fs||fc;
 
-  // 검색 모드
-  if(f){
-    srchEl.style.display='block';
-    accEl.style.display='none';
-    const list = markers.filter(m=>m.name.includes(f)||(m.type||'').includes(f));
-    if(!list.length){ srchEl.innerHTML='<div class="empty">검색 결과 없음</div>'; return; }
-    srchEl.innerHTML='';
-    list.forEach(m=>{ const cat=CATS.find(c=>c.id===m.cat); srchEl.appendChild(mkMcard(m,cat)); });
-    return;
+  // 카테고리 필터 옵션 채우기
+  const catSel=document.getElementById('flt-cat');
+  if(catSel && catSel.options.length<=1){
+    CATS.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.ico+' '+c.lbl;catSel.appendChild(o);});
   }
 
-  // 아코디언 모드
-  srchEl.style.display='none';
-  accEl.style.display='block';
-  accEl.innerHTML='';
+  const filtered = getFilteredMarkers();
 
-  if(!markers.length){ accEl.innerHTML='<div class="empty">등록된 업소가 없습니다.</div>'; return; }
-
-  CATS.forEach(cat=>{
-    const list = markers.filter(m=>m.cat===cat.id);
-    if(!list.length) return;
-
-    const isOpen = accOpen[cat.id] !== false; // 기본 닫힘 (공실은 기본 열림)
-    const wrap = document.createElement('div');
-    wrap.className='cat-acc';
-
-    const hd = document.createElement('div');
-    hd.className='cat-acc-hd'+(isOpen?' open':'');
-    hd.innerHTML=`
-      <div class="cat-acc-dot" style="background:${cat.color}"></div>
-      <span class="cat-acc-lbl">${cat.ico} ${cat.lbl}</span>
-      <span class="cat-acc-cnt" style="background:${cat.color}">${list.length}</span>
-      <span class="cat-acc-arrow">▼</span>`;
-    hd.onclick=()=>{ hd.classList.toggle('open'); accOpen[cat.id]=hd.classList.contains('open'); };
-
-    const body = document.createElement('div');
-    body.className='cat-acc-body';
-    list.forEach(m=>body.appendChild(mkMcard(m,cat)));
-
-    wrap.appendChild(hd); wrap.appendChild(body);
-    accEl.appendChild(wrap);
-  });
+  if(hasFilter){
+    srchEl.style.display='block';
+    srchEl.innerHTML='<div style="font-size:11px;color:#888;margin-bottom:6px">'+filtered.length+'개 결과</div>';
+    filtered.forEach(m=>{
+      const cat=CATS.find(c=>c.id===m.cat); if(!cat)return;
+      srchEl.appendChild(mkMcard(m,cat));
+    });
+    accEl.innerHTML='';
+  } else {
+    srchEl.style.display='none'; srchEl.innerHTML='';
+    accEl.innerHTML='';
+    CATS.forEach(cat=>{
+      const ms=markers.filter(m=>m.cat===cat.id); if(!ms.length)return;
+      const acc=document.createElement('div'); acc.className='cat-acc';
+      const hd=document.createElement('div'); hd.className='cat-acc-hd'+(accOpen[cat.id]?' open':'');
+      hd.innerHTML=`<div class="cat-acc-dot" style="background:${cat.color}"></div>
+        <span class="cat-acc-lbl">${cat.ico} ${cat.lbl}</span>
+        <span class="cat-acc-cnt" style="background:${cat.color}">${ms.length}</span>
+        <span class="cat-acc-arrow">▾</span>`;
+      hd.onclick=()=>{ accOpen[cat.id]=!accOpen[cat.id]; hd.classList.toggle('open'); bd.style.display=hd.classList.contains('open')?'block':'none'; };
+      const bd=document.createElement('div'); bd.className='cat-acc-body';
+      bd.style.display=accOpen[cat.id]?'block':'none';
+      ms.forEach(m=>bd.appendChild(mkMcard(m,cat)));
+      acc.appendChild(hd); acc.appendChild(bd); accEl.appendChild(acc);
+    });
+  }
 }
-
-function filterList(){
-  drawList();
-}
+function filterList(){ drawList(); }
 function flyTo(id){ const m=markers.find(m=>m.id===id); if(m){map.flyTo([m.lat,m.lng],19);m.leaflet.openPopup();} }
 
 /* ════════════════════════════════
@@ -1205,11 +1619,38 @@ function flyTo(id){ const m=markers.find(m=>m.id===id); if(m){map.flyTo([m.lat,m
 ════════════════════════════════ */
 function drawStats(){
   const total=markers.length, vacant=markers.filter(m=>m.status==='빈 점포').length, closed=markers.filter(m=>m.status==='폐업').length;
+  const vacPct=total?Math.round(vacant/total*100):0;
   document.getElementById('sg').innerHTML=`
     <div class="sc"><div class="sc-n">${total}</div><div class="sc-l">총 업소</div></div>
     <div class="sc"><div class="sc-n">${vacant}</div><div class="sc-l">빈 점포</div></div>
     <div class="sc"><div class="sc-n">${closed}</div><div class="sc-l">폐업</div></div>
-    <div class="sc"><div class="sc-n">${lines.length}</div><div class="sc-l">구역 라인</div></div>`;
+    <div class="sc"><div class="sc-n">${vacPct}%</div><div class="sc-l">공실률</div></div>`;
+
+  // 구역별 통계
+  const zoneEl=document.getElementById('zone-stats');
+  zoneEl.innerHTML='';
+  ZONES.forEach(z=>{
+    const ms=markers.filter(m=>(m.zone||detectZone(m.lat,m.lng,m.id))===z.id);
+    if(!ms.length) return;
+    const vac=ms.filter(m=>m.status==='빈 점포').length;
+    const cl=ms.filter(m=>m.status==='폐업').length;
+    const vp=Math.round(vac/ms.length*100);
+    zoneEl.innerHTML+=`
+      <div style="background:#f7f8fa;border-radius:8px;padding:9px;margin-bottom:8px;border-left:4px solid ${z.color}">
+        <div style="font-size:12px;font-weight:700;color:${z.color};margin-bottom:5px">${z.lbl} (${ms.length}개)</div>
+        <div style="display:flex;gap:6px;font-size:11px">
+          <span>빈점포 <b>${vac}(${vp}%)</b></span>
+          <span>폐업 <b>${cl}</b></span>
+          <span>영업중 <b>${ms.filter(m=>m.status==='영업중').length}</b></span>
+        </div>
+        <div style="margin-top:5px">${CATS.map(c=>{
+          const n=ms.filter(m=>m.cat===c.id).length;
+          return n?`<span style="font-size:10px;background:${c.color}22;padding:1px 6px;border-radius:8px;margin:2px 2px 0 0;display:inline-block">${c.ico}${n}</span>`:'';
+        }).join('')}</div>
+      </div>`;
+  });
+
+  // 카테고리 분포
   const chart=document.getElementById('schart');
   chart.innerHTML='';
   CATS.forEach(cat=>{
@@ -1227,28 +1668,104 @@ function drawStats(){
 /* ════════════════════════════════
    라인 / 폴리곤
 ════════════════════════════════ */
+function setPresetWeight(w){
+  document.getElementById('lw').value = w;
+  [2,4,6,9].forEach(v=>{
+    const btn = document.getElementById('pw-btn-'+v);
+    if(btn) btn.classList.toggle('pw-btn-active', v===w);
+  });
+}
+function setZonePreset(color, name){
+  document.getElementById('lc').value = color;
+  document.getElementById('ll').value = name;
+  // 바로 그리기 시작
+  startLine();
+  // 상태바 라벨 업데이트
+  const bar = document.getElementById('draw-active-bar');
+  const lbl = document.getElementById('draw-active-label');
+  const colorMap = {'#e63946':'🔴','#2196F3':'🔵','#4CAF50':'🟢','#FF9800':'🟠','#9C27B0':'🟣'};
+  const ico = colorMap[color]||'✏️';
+  if(lbl) lbl.textContent = `${ico} "${name}" 그리는 중…`;
+}
+function showDrawBar(label){
+  const bar = document.getElementById('draw-active-bar');
+  const lbl = document.getElementById('draw-active-label');
+  if(bar) bar.style.display='block';
+  if(lbl && label) lbl.textContent = label;
+  // 구역 탭으로 이동
+  goTab(1);
+}
+function hideDrawBar(){
+  const bar = document.getElementById('draw-active-bar');
+  if(bar) bar.style.display='none';
+}
+function finishDraw(){
+  if(!drawH) return;
+  try{ drawH._finishShape(); }
+  catch(e){ /* 점이 2개 미만이면 무시 */ }
+}
+function cancelDraw(){
+  if(!drawH) return;
+  drawH.disable();
+  drawH=null;
+  map.getContainer().style.cursor='';
+  hideDrawBar();
+  sb('✕ 그리기 취소됨');
+}
 function startLine(){
+  if(drawH){ drawH.disable(); }
   drawH=new L.Draw.Polyline(map,{shapeOptions:{color:document.getElementById('lc').value,weight:+document.getElementById('lw').value,opacity:.9}});
   drawH.enable(); map.getContainer().style.cursor='crosshair';
-  sb('✏️ 라인: 클릭으로 점 추가, 더블클릭으로 완료');
+  showDrawBar('✏️ 라인 그리는 중…');
+  sb('✏️ 라인: 클릭으로 점 추가, 더블클릭 또는 ✅ 완료 버튼으로 저장');
 }
 function startPoly(){
+  if(drawH){ drawH.disable(); }
   drawH=new L.Draw.Polygon(map,{shapeOptions:{color:document.getElementById('lc').value,weight:+document.getElementById('lw').value,fillOpacity:.1,opacity:.85}});
   drawH.enable(); map.getContainer().style.cursor='crosshair';
-  sb('⬡ 폴리곤: 클릭으로 꼭짓점, 첫 점 클릭으로 완료');
+  showDrawBar('⬡ 폴리곤 그리는 중…');
+  sb('⬡ 폴리곤: 클릭으로 꼭짓점 추가, 첫 점 클릭 또는 ✅ 완료 버튼으로 저장');
 }
 map.on(L.Draw.Event.CREATED, e=>{
   const lbl=document.getElementById('ll').value.trim();
   const layer=e.layer;
   if(lbl) layer.bindPopup(`<b>${lbl}</b>`);
+  // 스타일 저장 (나중에 색상 복원용)
+  layer._savedStyle={
+    color: layer.options.color||document.getElementById('lc').value||'#e63946',
+    weight: layer.options.weight||+(document.getElementById('lw').value)||4,
+    opacity: layer.options.opacity||.9
+  };
   drawn.addLayer(layer);
   lines.push({id:nid++,leaflet:layer,lbl});
   drawH=null; map.getContainer().style.cursor='';
-  persist(); sb(`✅ ${lbl?'"'+lbl+'"':'라인'} 추가됨`);
+  hideDrawBar();
+  persist(); drawLinesList(); sb(`✅ ${lbl?'"'+lbl+'"':'라인'} 저장됨`);
 });
+function drawLinesList(){
+  const el=document.getElementById('lines-list'); if(!el)return;
+  if(!lines.length){ el.innerHTML='<div style="font-size:11px;color:#bbb;text-align:center;padding:6px 0">그려진 선 없음</div>'; return; }
+  el.innerHTML='<div style="font-size:10px;color:#888;font-weight:700;margin-bottom:5px">그려진 선 ('+lines.length+'개)</div>';
+  lines.forEach(ln=>{
+    const color=ln.leaflet?.options?.color||ln.leaflet?._savedStyle?.color||'#999';
+    const lbl=ln.lbl||'(이름 없음)';
+    const div=document.createElement('div'); div.className='line-item';
+    div.innerHTML=`<div class="line-dot" style="background:${color}"></div>
+      <span class="line-lbl" title="${lbl}">${lbl}</span>
+      <button class="line-del" onclick="delLine(${ln.id})" title="이 선 삭제">✕</button>`;
+    el.appendChild(div);
+  });
+}
+function delLine(id){
+  const i=lines.findIndex(l=>l.id===id); if(i<0)return;
+  map.removeLayer(lines[i].leaflet);
+  drawn.removeLayer(lines[i].leaflet);
+  lines.splice(i,1);
+  persist(); drawLinesList(); sb('🗑 선 삭제됨');
+}
 function clearLines(){
   if(!confirm('라인을 모두 삭제할까요?'))return;
-  drawn.clearLayers(); lines=[]; persist(); sb('🗑 라인 삭제됨');
+  drawn.clearLayers(); lines=[]; persist(); drawLinesList(); sb('🗑 전체 라인 삭제됨');
 }
 
 /* ════════════════════════════════
@@ -1296,7 +1813,7 @@ function undoLast(){
 // Ctrl+Z 단축키 / ESC 닫기
 document.addEventListener('keydown', e=>{
   if((e.ctrlKey||e.metaKey) && e.key==='z' && !e.shiftKey){ e.preventDefault(); undoLast(); }
-  if(e.key==='Escape'){ stopQuickPlace(); const p=document.getElementById('place-picker'); if(p)p.classList.remove('show'); }
+  if(e.key==='Escape'){ stopQuickPlace(); stopMultiSelect(); cancelDraw(); const p=document.getElementById('place-picker'); if(p)p.classList.remove('show'); }
 });
 // 피커 외부 클릭 시 닫기 (배치 모드 진입 전)
 document.addEventListener('click', e=>{
@@ -1306,6 +1823,49 @@ document.addEventListener('click', e=>{
   if(!picker.contains(e.target) && e.target!==btn) picker.classList.remove('show');
 });
 
+/* ════════════════════════════════
+   【1-b】 다중 마커 선택 이동 모드
+════════════════════════════════ */
+function updateMultiSelectBtn(){
+  const btn = document.getElementById('multi-sel-btn');
+  if(!btn) return;
+  const cnt = selectedMarkers.size;
+  if(isMultiSelect){
+    btn.textContent = cnt > 0 ? `📦 ${cnt}개 선택됨` : '📦 다중 선택 ON';
+    btn.classList.add('active-tool');
+  } else {
+    btn.textContent = '📦 다중 선택';
+    btn.classList.remove('active-tool');
+  }
+}
+function stopMultiSelect(){
+  isMultiSelect = false;
+  // 선택 해제 시 아이콘 원복
+  selectedMarkers.forEach(id=>{
+    const mk=markers.find(x=>x.id===id);
+    if(!mk) return;
+    const cat=CATS.find(c=>c.id===mk.cat);
+    if(cat) mk.leaflet.setIcon(makeIcon(cat,mk.status,showNums?mk.num:null,false));
+  });
+  selectedMarkers.clear();
+  _msStartLL=null; _msStartPos={};
+  markers.forEach(m=>{ m.leaflet.dragging.disable(); });
+  map.getContainer().classList.remove('multi-select-mode');
+  updateMultiSelectBtn();
+}
+function toggleMultiSelect(){
+  if(isMultiSelect){ stopMultiSelect(); sb('📦 다중 선택 모드 OFF'); return; }
+  // 다른 모드 끄기
+  if(isDragMode) toggleDragMode();
+  if(isRouteMode) finishRoute();
+  stopQuickPlace();
+  isMultiSelect = true;
+  // 선택된 마커 드래그 가능하게
+  markers.forEach(m=>{ m.leaflet.dragging.enable(); });
+  map.getContainer().classList.add('multi-select-mode');
+  updateMultiSelectBtn();
+  sb('📦 다중 선택 모드 ON — 마커를 클릭해 선택 후 드래그하면 함께 이동합니다. ESC로 종료.');
+}
 /* ════════════════════════════════
    【2】 마커 드래그 이동 모드
 ════════════════════════════════ */
@@ -1328,7 +1888,8 @@ function toggleDragMode(){
     // 이동 모드 중 마커 추가·배치 비활성
     cancelAdd();
     stopQuickPlace();
-    sb('✥ 이동 모드 ON — 마커를 드래그해 위치를 수정하세요. 완료 후 다시 클릭해 끄세요.');
+    stopMultiSelect();
+    sb('✥ 이동 모드 ON — 마커를 꾹 누른 채 드래그하세요. 클릭하면 팝업 없이 바로 이동만 됩니다.');
   } else {
     map.getContainer().style.cursor='';
     sb('✥ 이동 모드 OFF');
@@ -1492,8 +2053,10 @@ function finishRoute(){
     color:col, weight:5, opacity:.9
   });
   if(label) finalLine.bindPopup(`<b style="font-size:13px">📍 ${label}</b><br><span style="font-size:11px;color:#666">${routePts.length}개 경유지</span>`);
+  finalLine._savedStyle={color:col,weight:5,opacity:.9};
   drawn.addLayer(finalLine);
   lines.push({id:nid++, leaflet:finalLine, lbl:label});
+  drawLinesList();
 
   // 웨이포인트 번호 마커 제거 (완료된 경로는 선만 남김)
   routeWPs.forEach(w=>map.removeLayer(w));
@@ -1540,9 +2103,18 @@ function genQR(){
    데이터 저장 / 로드
 ════════════════════════════════ */
 function persist(){
-  localStorage.setItem('ms',JSON.stringify(markers.map(m=>({id:m.id,lat:m.lat,lng:m.lng,cat:m.cat,name:m.name,type:m.type,floor:m.floor,status:m.status,memo:m.memo}))));
+  localStorage.setItem('ms',JSON.stringify(markers.map(m=>({id:m.id,lat:m.lat,lng:m.lng,cat:m.cat,name:m.name,type:m.type,floor:m.floor,status:m.status,memo:m.memo,zone:m.zone||'',addr:m.addr||'',photos:m.photos||[]}))));
   localStorage.setItem('nid',nid);
-  const geo=[]; drawn.eachLayer(l=>{try{geo.push(l.toGeoJSON());}catch(e){}});
+  const geo=[]; drawn.eachLayer(l=>{
+    try{
+      const gj=l.toGeoJSON();
+      // 색상/두께 속성 보존
+      const s=l._savedStyle||l.options;
+      gj.properties=gj.properties||{};
+      if(s&&s.color) gj.properties._style={color:s.color,weight:s.weight||4,opacity:s.opacity||.9};
+      geo.push(gj);
+    }catch(e){}
+  });
   localStorage.setItem('ls',JSON.stringify(geo));
   if(isFB) pushFB();
 }
@@ -1553,8 +2125,9 @@ function loadLocal(){
   if(!raw){
     INITIAL_DATA.forEach(m=>{
       const cat=CATS.find(c=>c.id===m.cat); if(!cat)return;
-      const lf=mkMarker({lat:m.lat,lng:m.lng},cat,m.id,m.name,m.type,m.floor,m.status,m.memo);
-      markers.push({...m,leaflet:lf});
+      if(!m.zone) m.zone=detectZone(m.lat,m.lng,m.id);
+      const lf=mkMarker({lat:m.lat,lng:m.lng},cat,m.id,m.name,m.type,m.floor,m.status,m.memo,m.zone,m.addr||'',m.photos||[]);
+      markers.push({...m,addr:m.addr||'',photos:m.photos||[],leaflet:lf});
       if(m.id>=nid) nid=m.id+1;
     });
     persist();
@@ -1563,8 +2136,9 @@ function loadLocal(){
     if(rawId) nid=+rawId;
     JSON.parse(raw).forEach(m=>{
       const cat=CATS.find(c=>c.id===m.cat); if(!cat)return;
-      const lf=mkMarker({lat:m.lat,lng:m.lng},cat,m.id,m.name,m.type,m.floor,m.status,m.memo);
-      markers.push({...m,leaflet:lf});
+      if(!m.zone) m.zone=detectZone(m.lat,m.lng,m.id);
+      const lf=mkMarker({lat:m.lat,lng:m.lng},cat,m.id,m.name,m.type,m.floor,m.status,m.memo,m.zone,m.addr||'',m.photos||[]);
+      markers.push({...m,addr:m.addr||'',photos:m.photos||[],leaflet:lf});
     });
   }
   const rawL=localStorage.getItem('ls');
@@ -1572,17 +2146,102 @@ function loadLocal(){
     // Point 타입은 제외 (경로 번호 마커 잔재 필터링)
     const geomType = geo?.geometry?.type || geo?.type;
     if(geomType==='Point' || geomType==='MultiPoint') return;
-    const layer=L.geoJSON(geo,{style:{color:'#e63946',weight:4,opacity:.9}});
-    layer.eachLayer(l=>{drawn.addLayer(l);lines.push({id:nid++,leaflet:l});});
+    // 저장된 스타일 복원 (없으면 기본 빨강)
+    const savedStyle = geo.properties?._style || {color:'#e63946',weight:4,opacity:.9};
+    const layer=L.geoJSON(geo,{style:savedStyle});
+    layer.eachLayer(l=>{
+      l._savedStyle=savedStyle
+      l._savedStyle=savedStyle;
+      drawn.addLayer(l);lines.push({id:nid++,leaflet:l});
+    });
   });
   drawCats();
+  drawLinesList();
 }
 
+/* ════════════════════════════════
+   주소 자동 조회 (카카오 프록시)
+   → proxy_server.py 경유로 CORS 없이 카카오 REST API 호출
+════════════════════════════════ */
+const _addrQueue=[];
+let _addrBusy=false;
+function fetchAddr(mObj){
+  _addrQueue.push(mObj);
+  if(!_addrBusy) _processAddrQueue();
+}
+async function _processAddrQueue(){
+  if(!_addrQueue.length){ _addrBusy=false; return; }
+  _addrBusy=true;
+  const m=_addrQueue.shift();
+  if(m.addr){ _processAddrQueue(); return; }
+  try{
+    const r=await fetch(`/kakao-geocode?x=${m.lng}&y=${m.lat}`);
+    const d=await r.json();
+    if(d.documents && d.documents.length>0){
+      const doc=d.documents[0];
+      m.addr=doc.road_address?.address_name||doc.address?.address_name||'';
+    }
+    const cat=CATS.find(c=>c.id===m.cat);
+    if(cat&&m.leaflet) m.leaflet.setPopupContent(mkPopupHTML(cat,m.id,m.name,m.type,m.floor,m.status,m.memo,m.zone,m.addr,m.photos));
+    persist();
+  }catch(e){}
+  _processAddrQueue();
+}
+
+/* ════════════════════════════════
+   엑셀 / CSV 내보내기
+════════════════════════════════ */
+function exportExcel(){
+  if(typeof XLSX==='undefined'){ alert('엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
+  const rows=markers.map(m=>({
+    'ID':m.id,
+    '구역':zoneLbl(m.zone||detectZone(m.lat,m.lng,m.id)),
+    '업소명':m.name,
+    '카테고리':CATS.find(c=>c.id===m.cat)?.lbl||m.cat,
+    '상세업종':m.type||'',
+    '층수':m.floor||'',
+    '영업상태':m.status,
+    '주소':m.addr||'',
+    '메모':m.memo||'',
+    '위도':m.lat,
+    '경도':m.lng,
+    '사진수':(m.photos||[]).length,
+  }));
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:5},{wch:9},{wch:18},{wch:9},{wch:12},{wch:6},{wch:7},{wch:28},{wch:20},{wch:11},{wch:11},{wch:5}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'현장조사(전체)');
+  ZONES.forEach(z=>{
+    const zm=markers.filter(m=>(m.zone||detectZone(m.lat,m.lng,m.id))===z.id);
+    if(!zm.length) return;
+    const zws=XLSX.utils.json_to_sheet(zm.map(m=>({
+      'ID':m.id,'업소명':m.name,
+      '카테고리':CATS.find(c=>c.id===m.cat)?.lbl||m.cat,
+      '상세업종':m.type||'','층수':m.floor||'','영업상태':m.status,'주소':m.addr||'','메모':m.memo||'',
+    })));
+    XLSX.utils.book_append_sheet(wb,zws,z.lbl);
+  });
+  const date=new Date().toLocaleDateString('ko-KR').replace(/[.\s]/g,'');
+  XLSX.writeFile(wb,`현장조사_${date}.xlsx`);
+  sb('📊 엑셀 저장됨 (전체+구역별 시트)');
+}
+function exportCSV(){
+  const hdr=['ID','구역','업소명','카테고리','상세업종','층수','영업상태','주소','메모','위도','경도'];
+  const rows=markers.map(m=>[m.id,zoneLbl(m.zone||detectZone(m.lat,m.lng,m.id)),m.name,
+    CATS.find(c=>c.id===m.cat)?.lbl||m.cat,m.type||'',m.floor||'',m.status,m.addr||'',m.memo||'',m.lat,m.lng]
+    .map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(','));
+  const csv='\uFEFF'+[hdr.join(','),...rows].join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  const date=new Date().toLocaleDateString('ko-KR').replace(/[.\s]/g,'');
+  a.download=`현장조사_${date}.csv`; a.click();
+  sb('📄 CSV 저장됨');
+}
 function exportJSON(){
-  const data={markers:markers.map(m=>({id:m.id,lat:m.lat,lng:m.lng,cat:m.cat,name:m.name,type:m.type,floor:m.floor,status:m.status,memo:m.memo})),exportedAt:new Date().toISOString()};
+  const data={markers:markers.map(m=>({id:m.id,lat:m.lat,lng:m.lng,cat:m.cat,name:m.name,type:m.type,floor:m.floor,status:m.status,memo:m.memo,zone:m.zone||'',addr:m.addr||''})),exportedAt:new Date().toISOString()};
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
-  a.download=`현장조사_${new Date().toLocaleDateString('ko-KR').replace(/[. ]/g,'_').replace(/\.$/,'')}.json`;
+  a.download=`현장조사_${new Date().toLocaleDateString('ko-KR').replace(/[.\s]/g,'_')}.json`;
   a.click(); sb('💾 JSON 저장됨');
 }
 function triggerImport(){ document.getElementById('imp-file').click(); }
@@ -1596,8 +2255,9 @@ function importJSON(e){
       data.markers.forEach(m=>{
         if(markers.find(x=>x.id===m.id))return;
         const cat=CATS.find(c=>c.id===m.cat);if(!cat)return;
-        const lf=mkMarker({lat:m.lat,lng:m.lng},cat,m.id,m.name,m.type,m.floor,m.status,m.memo);
-        markers.push({...m,leaflet:lf});
+        const zone=m.zone||detectZone(m.lat,m.lng,m.id);
+        const lf=mkMarker({lat:m.lat,lng:m.lng},cat,m.id,m.name,m.type,m.floor,m.status,m.memo,zone,m.addr||'',m.photos||[]);
+        markers.push({...m,zone,addr:m.addr||'',photos:m.photos||[],leaflet:lf});
         if(m.id>=nid)nid=m.id+1;
       });
       persist(); drawCats(); drawList(); sb(`📂 ${data.markers.length}개 불러옴`);
@@ -1614,17 +2274,99 @@ function clearAll(){
 }
 
 /* ════════════════════════════════
+   히트맵 오버레이
+════════════════════════════════ */
+function toggleHeatmap(){
+  const btn=document.getElementById('heat-btn');
+  if(isHeatOn){
+    if(heatLayer) map.removeLayer(heatLayer);
+    heatLayer=null; isHeatOn=false;
+    btn.classList.remove('active-tool'); btn.textContent='🌡 히트맵';
+    sb('히트맵 OFF');
+  } else {
+    if(typeof L.heatLayer==='undefined'){ sb('⚠️ 히트맵 라이브러리 로딩 중...'); return; }
+    const pts=markers.map(m=>{
+      const w=m.status==='빈 점포'?1.0:m.status==='폐업'?0.75:0.15;
+      return [m.lat,m.lng,w];
+    });
+    heatLayer=L.heatLayer(pts,{radius:28,blur:20,maxZoom:19,
+      gradient:{0.2:'#2196F3',0.5:'#FF9800',0.8:'#f44336',1.0:'#b71c1c'}}).addTo(map);
+    isHeatOn=true;
+    btn.classList.add('active-tool'); btn.textContent='🌡 히트맵 ON';
+    sb('🌡 히트맵 ON — 빨간 구역 = 공실·폐업 집중. 파란 구역 = 영업중 집중.');
+  }
+}
+
+/* ════════════════════════════════
+   일괄편집
+════════════════════════════════ */
+function toggleBulkMode(){
+  isBulkMode=!isBulkMode;
+  bulkSelected.clear();
+  const bar=document.getElementById('bulk-bar');
+  const btn=document.getElementById('bulk-toggle-btn');
+  if(isBulkMode){
+    bar.classList.add('show'); btn.classList.add('active-tool'); btn.textContent='✕ 종료';
+    document.getElementById('tp2').classList.add('bulk-mode');
+  } else {
+    bar.classList.remove('show'); btn.classList.remove('active-tool'); btn.textContent='☑ 일괄편집';
+    document.getElementById('tp2').classList.remove('bulk-mode');
+  }
+  updateBulkCount(); drawList();
+}
+function toggleBulkItem(id,checked){
+  if(checked) bulkSelected.add(id); else bulkSelected.delete(id);
+  updateBulkCount();
+}
+function updateBulkCount(){
+  const el=document.getElementById('bulk-count');
+  if(el) el.textContent=bulkSelected.size+'개 선택됨';
+}
+function selectAllFiltered(){
+  getFilteredMarkers().forEach(m=>bulkSelected.add(m.id));
+  updateBulkCount(); drawList();
+}
+function applyBulkStatus(){
+  const stat=document.getElementById('bulk-status-sel').value;
+  if(!stat||!bulkSelected.size){ sb('상태를 선택하고 마커를 선택하세요'); return; }
+  if(!confirm(`${bulkSelected.size}개를 "${stat}"으로 변경할까요?`)) return;
+  const cnt=bulkSelected.size;
+  bulkSelected.forEach(id=>{
+    const m=markers.find(m=>m.id===id); if(!m)return;
+    m.status=stat;
+    const cat=CATS.find(c=>c.id===m.cat);
+    if(cat&&m.leaflet){
+      m.leaflet.setIcon(makeIcon(cat,m.status,showNums?m.num:null,false));
+      m.leaflet.setPopupContent(mkPopupHTML(cat,m.id,m.name,m.type,m.floor,m.status,m.memo,m.zone,m.addr,m.photos));
+    }
+  });
+  bulkSelected.clear(); updateBulkCount();
+  persist(); drawList(); drawCats();
+  if(isHeatOn){ toggleHeatmap(); toggleHeatmap(); }
+  sb(`✅ ${cnt}개 마커 → "${stat}" 변경 완료`);
+}
+function bulkDelete(){
+  if(!bulkSelected.size){ sb('마커를 선택하세요'); return; }
+  if(!confirm(`선택한 ${bulkSelected.size}개를 삭제할까요?`)) return;
+  const cnt=bulkSelected.size;
+  [...bulkSelected].forEach(id=>{
+    const i=markers.findIndex(m=>m.id===id); if(i<0)return;
+    map.removeLayer(markers[i].leaflet); markers.splice(i,1);
+  });
+  bulkSelected.clear(); updateBulkCount();
+  persist(); drawList(); drawCats(); refreshNums();
+  sb(`🗑 ${cnt}개 삭제 완료`);
+}
+
+/* ════════════════════════════════
    초기화
 ════════════════════════════════ */
 (function init(){
-  // 데이터 버전 관리 — 버전이 다르면 캐시 초기화
   const DATA_VER = '20250514-v5';
   if(localStorage.getItem('data_ver') !== DATA_VER){
     localStorage.removeItem('ms');
-    localStorage.removeItem('ls');
     localStorage.setItem('data_ver', DATA_VER);
   }
-
   const s=localStorage.getItem('setup');
   const urlRoom=new URLSearchParams(location.search).get('room');
   if(urlRoom){
@@ -1632,7 +2374,7 @@ function clearAll(){
     setModeTab('firebase');
     const saved=localStorage.getItem('fb_cfg');
     if(saved) document.getElementById('fb-cfg').value=saved;
-    return; // show modal for Firebase setup
+    return;
   }
   if(s==='firebase'){
     const cfg=localStorage.getItem('fb_cfg'), room=localStorage.getItem('fb_room');
@@ -1640,16 +2382,13 @@ function clearAll(){
       document.getElementById('fb-cfg').value=cfg;
       document.getElementById('fb-room').value=room;
       document.getElementById('setup-modal').classList.add('hidden');
-      loadLocal();
-      startFirebase();
-      return;
+      loadLocal(); startFirebase(); return;
     }
   }
   if(s==='local'){
     document.getElementById('setup-modal').classList.add('hidden');
     loadLocal();
   }
-  // else: show modal
 })();
 </script>
 </body>
