@@ -662,8 +662,9 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
     </div>
     <div class="fg"><label>색상</label>
       <select id="lc">
-        <option value="#e63946">🔴 조사 경계</option>
-        <option value="#2196F3">🔵 이동 경로</option>
+        <option value="#e63946">🔴 메인거리</option>
+        <option value="#FFC107">🟡 관덕정</option>
+        <option value="#2196F3">🔵 산지천</option>
         <option value="#4CAF50">🟢 상업 가로</option>
         <option value="#FF9800">🟠 관심 구간</option>
         <option value="#9C27B0">🟣 기타</option>
@@ -1979,7 +1980,7 @@ function setZonePreset(color, name){
   // 상태바 라벨 업데이트
   const bar = document.getElementById('draw-active-bar');
   const lbl = document.getElementById('draw-active-label');
-  const colorMap = {'#e63946':'🔴','#2196F3':'🔵','#4CAF50':'🟢','#FF9800':'🟠','#9C27B0':'🟣'};
+  const colorMap = {'#e63946':'🔴','#FFC107':'🟡','#2196F3':'🔵','#4CAF50':'🟢','#FF9800':'🟠','#9C27B0':'🟣'};
   const ico = colorMap[color]||'✏️';
   if(lbl) lbl.textContent = `${ico} "${name}" 그리는 중…`;
 }
