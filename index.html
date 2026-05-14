@@ -391,11 +391,12 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
   }
 }
 
-/* ── GPS 내 위치 버튼 (데스크탑 + 모바일 공통) ── */
+/* ── GPS 내 위치 버튼 ── */
 #gps-btn{
-  position:absolute;
-  bottom:44px;left:10px;
-  z-index:800;
+  position:fixed;
+  bottom:44px;
+  left:10px;
+  z-index:1200;
   width:40px;height:40px;
   background:#fff;
   border:none;
@@ -411,19 +412,19 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
   animation:gpsPulse .7s ease-in-out infinite alternate;
 }
 @keyframes gpsPulse{
-  from{stroke-opacity:.4;r:11}
-  to{stroke-opacity:.9;r:13}
+  from{stroke-opacity:.4}
+  to{stroke-opacity:1}
 }
+/* 모바일: FAB 위쪽에 배치 */
 @media(max-width:768px){
   #gps-btn{
-    position:fixed!important;
-    bottom:122px!important;
-    right:14px!important;
-    left:auto!important;
+    bottom:122px;
+    right:14px;
+    left:auto;
     width:46px;height:46px;
     border-radius:50%;
     box-shadow:0 2px 10px rgba(0,0,0,.25);
-    z-index:1340!important;
+    z-index:1340;
   }
 }
 
@@ -494,7 +495,6 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
   /* 모바일에서 기존 툴바 숨기고 FAB로 대체 */
   #map-toolbar{ display:none!important; }
   #fab-wrap{ display:flex; }
-  /* gps-btn 모바일 스타일은 별도 @media 블록에서 처리 */
 }
 @media(min-width:769px){
   #fab-wrap{display:none!important}
@@ -872,23 +872,20 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
     <div id="pp-list"></div>
   </div>
 
-  <!-- GPS 내 위치 버튼 (Google Maps 스타일) -->
-  <button id="gps-btn" onclick="goToMyLocation()" title="내 위치로 이동">
-    <svg id="gps-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <!-- 바깥 원 -->
-      <circle class="outer" cx="12" cy="12" r="10" stroke="#4285F4" stroke-width="1.5" fill="none" stroke-opacity="0.3"/>
-      <!-- 십자선 가로 -->
-      <line x1="2" y1="12" x2="7" y2="12" stroke="#4285F4" stroke-width="2" stroke-linecap="round"/>
-      <line x1="17" y1="12" x2="22" y2="12" stroke="#4285F4" stroke-width="2" stroke-linecap="round"/>
-      <!-- 십자선 세로 -->
-      <line x1="12" y1="2" x2="12" y2="7" stroke="#4285F4" stroke-width="2" stroke-linecap="round"/>
-      <line x1="12" y1="17" x2="12" y2="22" stroke="#4285F4" stroke-width="2" stroke-linecap="round"/>
-      <!-- 중앙 점 -->
-      <circle cx="12" cy="12" r="3.5" fill="#4285F4"/>
-      <circle cx="12" cy="12" r="1.5" fill="#fff"/>
-    </svg>
-  </button>
 </div>
+
+<!-- GPS 버튼 + 모바일 스피드 다이얼 FAB (항상 fixed) -->
+<button id="gps-btn" onclick="goToMyLocation()" title="내 위치로 이동">
+  <svg id="gps-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle class="outer" cx="12" cy="12" r="10" stroke="#4285F4" stroke-width="1.5" fill="none" stroke-opacity="0.3"/>
+    <line x1="2" y1="12" x2="7" y2="12" stroke="#4285F4" stroke-width="2" stroke-linecap="round"/>
+    <line x1="17" y1="12" x2="22" y2="12" stroke="#4285F4" stroke-width="2" stroke-linecap="round"/>
+    <line x1="12" y1="2" x2="12" y2="7" stroke="#4285F4" stroke-width="2" stroke-linecap="round"/>
+    <line x1="12" y1="17" x2="12" y2="22" stroke="#4285F4" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="12" cy="12" r="3.5" fill="#4285F4"/>
+    <circle cx="12" cy="12" r="1.5" fill="#fff"/>
+  </svg>
+</button>
 
 <!-- 모바일 스피드 다이얼 FAB -->
 <div id="fab-wrap">
