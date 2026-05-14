@@ -516,8 +516,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
     <div class="fg"><label>구역</label>
       <select id="em-zone">
         <option value="main">🔴 메인거리</option>
-        <option value="gwanduk">🔵 관덕정</option>
-        <option value="sanjicheon">🟢 산지천</option>
+        <option value="gwanduk">🟡 관덕정</option>
+        <option value="sanjicheon">🔵 산지천</option>
         <option value="etc">⚪ 기타</option>
       </select>
     </div>
@@ -634,8 +634,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
       <div style="font-size:10px;color:#888;font-weight:700;margin-bottom:5px">⚡ 구역 프리셋 (클릭 → 바로 그리기 시작)</div>
       <div class="zone-preset-row">
         <button class="zone-preset-btn" style="background:#e63946" onclick="setZonePreset('#e63946','메인거리')">🔴 메인거리</button>
-        <button class="zone-preset-btn" style="background:#2196F3" onclick="setZonePreset('#2196F3','관덕정')">🔵 관덕정</button>
-        <button class="zone-preset-btn" style="background:#4CAF50" onclick="setZonePreset('#4CAF50','산지천')">🟢 산지천</button>
+        <button class="zone-preset-btn" style="background:#FFC107;color:#333" onclick="setZonePreset('#FFC107','관덕정')">🟡 관덕정</button>
+        <button class="zone-preset-btn" style="background:#2196F3" onclick="setZonePreset('#2196F3','산지천')">🔵 산지천</button>
       </div>
       <div style="display:flex;align-items:center;gap:5px;margin-top:5px">
         <span style="font-size:10px;color:#999;white-space:nowrap">굵기</span>
@@ -716,8 +716,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
       <select id="flt-zone" onchange="filterList()">
         <option value="">전체 구역</option>
         <option value="main">🔴 메인거리</option>
-        <option value="gwanduk">🔵 관덕정</option>
-        <option value="sanjicheon">🟢 산지천</option>
+        <option value="gwanduk">🟡 관덕정</option>
+        <option value="sanjicheon">🔵 산지천</option>
         <option value="etc">⚪ 기타</option>
       </select>
       <select id="flt-status" onchange="filterList()">
@@ -924,9 +924,9 @@ const CATS = [
 const ZONES = [
   {id:'main',       lbl:'메인거리', color:'#e63946',
    bounds:{minLat:33.5140,maxLat:33.5185,minLng:33.5140,maxLng2:126.5265, minLng2:126.5210}},
-  {id:'gwanduk',    lbl:'관덕정',   color:'#2196F3',
+  {id:'gwanduk',    lbl:'관덕정',   color:'#FFC107',
    bounds:{minLat:33.5138,maxLat:33.5168,minLng:126.5195,maxLng:126.5228}},
-  {id:'sanjicheon', lbl:'산지천',   color:'#4CAF50',
+  {id:'sanjicheon', lbl:'산지천',   color:'#2196F3',
    bounds:{minLat:33.5125,maxLat:33.5158,minLng:126.5236,maxLng:126.5285}},
   {id:'etc',        lbl:'기타',     color:'#9E9E9E',
    bounds:null},
