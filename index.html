@@ -109,7 +109,7 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
 #mode-bar.show{display:block}
 
 /* ── 상태바 ── */
-#statusbar{position:fixed;bottom:0;left:290px;right:0;background:rgba(26,79,138,.88);color:#fff;padding:5px 14px;font-size:11px;z-index:999}
+#statusbar{position:fixed;bottom:0;left:290px;right:0;background:rgba(26,79,138,.88);color:#fff;padding:5px 14px;font-size:11px;z-index:999;transition:left .3s ease}
 
 /* ── 지도 위 플로팅 툴바 ── */
 #map-toolbar{
@@ -240,6 +240,113 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
 /* ── 통계 구역별 ── */
 .zone-stat-hd{font-size:12px;font-weight:700;margin:10px 0 5px;padding:5px 8px;border-radius:6px;color:#fff}
 /* ── 히트맵 버튼 ── */
+
+/* ── 사이드바 토글 ── */
+#sidebar{
+  transition:transform .3s ease,width .3s ease,min-width .3s ease;
+}
+#sidebar.collapsed{
+  transform:translateX(-290px);
+  width:0;min-width:0;
+}
+#sidebar-toggle{
+  position:absolute;
+  top:50%;
+  left:0;
+  transform:translateY(-50%);
+  z-index:1100;
+  width:22px;height:52px;
+  background:#fff;
+  border:1.5px solid #dde3ea;
+  border-left:none;
+  border-radius:0 8px 8px 0;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:2px 2px 8px rgba(0,0,0,.15);
+  font-size:14px;
+  color:#555;
+  transition:left .3s ease;
+  user-select:none;
+}
+#sidebar-toggle:hover{background:#f0f5ff;color:#1a4f8a}
+#sidebar-toggle.collapsed{left:0}
+
+/* ── 모바일 반응형 ── */
+@media(max-width:768px){
+  body{flex-direction:column}
+  #sidebar{
+    position:fixed;top:0;left:0;bottom:0;
+    width:280px!important;min-width:280px!important;
+    z-index:1200;
+    box-shadow:4px 0 20px rgba(0,0,0,.25);
+  }
+  #sidebar.collapsed{
+    transform:translateX(-290px);
+    width:280px!important;
+    min-width:280px!important;
+  }
+  #sidebar-toggle{
+    position:fixed!important;
+    top:50%!important;
+    left:0!important;
+    transform:translateY(-50%)!important;
+    z-index:1300!important;
+    width:28px;height:60px;
+    font-size:16px;
+    border-left:none;
+  }
+  /* 사이드바 열렸을 때 토글 버튼 위치 */
+  body.sidebar-open #sidebar-toggle{
+    left:280px!important;
+  }
+  #statusbar{
+    left:0!important;
+    font-size:11px;
+    padding:6px 12px;
+  }
+  /* 모바일 툴바: 오른쪽 상단으로 이동 */
+  #map-toolbar{
+    top:8px;left:auto;right:8px;gap:4px;
+    align-items:flex-end;
+  }
+  .map-tool-btn{
+    padding:6px 9px;font-size:11px;gap:4px;
+  }
+  #place-picker{
+    top:auto;bottom:50px;right:8px;left:auto;
+  }
+  .modal-box{padding:18px;width:95vw}
+  .edit-box{width:95vw!important;max-width:95vw!important}
+  /* 오버레이 배경 탭하면 닫힘 유도 */
+  #mob-overlay{
+    display:none;
+    position:fixed;inset:0;
+    background:rgba(0,0,0,.4);
+    z-index:1100;
+  }
+  #mob-overlay.show{display:block}
+}
+@media(min-width:769px){
+  #mob-overlay{display:none!important}
+}
+
+/* ── 모바일 팝업 최적화 ── */
+@media(max-width:768px){
+  .leaflet-popup-content-wrapper{
+    max-width:75vw!important;
+    font-size:12px!important;
+  }
+  .leaflet-popup-content{
+    margin:10px 12px!important;
+    font-size:12px!important;
+  }
+  /* 팝업 버튼들 터치 영역 확대 */
+  .popup-btn{
+    padding:6px 10px!important;
+    font-size:12px!important;
+    min-height:36px;
+  }
+}
 </style>
 </head>
 <body>
@@ -504,7 +611,8 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
       <button class="btn btn-s btn-sm" onclick="exportJSON()" style="flex:1">💾 JSON</button>
     </div>
     <div class="row" style="margin-bottom:6px">
-      <button class="btn btn-sm" onclick="syncToGithub()" style="flex:1;background:#24292e;color:#fff;border:none;border-radius:6px;padding:6px;cursor:pointer;font-size:12px">🐙 GitHub에 바로 저장</button>
+      <button class="btn btn-sm" onclick="syncToGithub()" style="flex:3;background:#24292e;color:#fff;border:none;border-radius:6px;padding:6px;cursor:pointer;font-size:12px">🐙 GitHub에 바로 저장</button>
+      <button class="btn btn-sm" onclick="resetGithubToken()" style="flex:1;background:#6c757d;color:#fff;border:none;border-radius:6px;padding:6px;cursor:pointer;font-size:11px" title="토큰 만료 시 여기서 리셋 후 재입력">🔑 토큰 리셋</button>
     </div>
     <div class="row">
       <button class="btn btn-s btn-sm" onclick="triggerImport()" style="flex:1">📂 불러오기</button>
@@ -570,8 +678,11 @@ body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;display:flex;height:
 </div><!-- /sidebar -->
 
 <!-- ══════════ 지도 ══════════ -->
+<div id="mob-overlay" onclick="closeSidebarMobile()"></div>
 <div style="flex:1;position:relative">
   <div id="map" style="width:100%;height:100%"></div>
+  <!-- 사이드바 토글 버튼 -->
+  <div id="sidebar-toggle" onclick="toggleSidebar()" title="사이드바 열기/닫기">◀</div>
 
   <!-- 지도 위 플로팅 툴바 -->
   <div id="map-toolbar">
@@ -1878,6 +1989,15 @@ function toggleDragMode(){
   btn.classList.toggle('active-tool', isDragMode);
   btn.textContent = isDragMode ? '✥ 이동 모드 ON' : '✥ 이동 모드';
 
+  map.getContainer().classList.toggle('drag-mode', isDragMode);
+  if(isDragMode){
+    // 이동 모드 중 마커 추가·배치 비활성 (dragging.enable 전에 호출해야 함)
+    cancelAdd();
+    stopQuickPlace();
+    stopMultiSelect(); // stopMultiSelect가 dragging.disable 하므로 반드시 먼저 호출
+  }
+
+  // stopMultiSelect() 이후에 dragging 상태 재설정
   markers.forEach(m=>{
     if(isDragMode){
       m.leaflet.dragging.enable();
@@ -1886,12 +2006,7 @@ function toggleDragMode(){
     }
   });
 
-  map.getContainer().classList.toggle('drag-mode', isDragMode);
   if(isDragMode){
-    // 이동 모드 중 마커 추가·배치 비활성
-    cancelAdd();
-    stopQuickPlace();
-    stopMultiSelect();
     sb('✥ 이동 모드 ON — 마커를 꾹 누른 채 드래그하세요. 클릭하면 팝업 없이 바로 이동만 됩니다.');
   } else {
     map.getContainer().style.cursor='';
@@ -2256,16 +2371,18 @@ const GH_FILE = 'data.json';
 
 async function syncToGithub(){
   let token = localStorage.getItem('gh_token') || '';
+
+  // 토큰 없거나 강제 재입력
   if(!token){
-    token = prompt('GitHub 토큰을 입력하세요 (최초 1회):');
+    token = prompt('GitHub 토큰을 입력하세요 (최초 1회):\n\n※ 만료됐으면 github.com → Settings → Developer settings → Personal access tokens에서 재발급');
     if(!token) return;
-    localStorage.setItem('gh_token', token.trim());
     token = token.trim();
+    localStorage.setItem('gh_token', token);
   }
 
   sb('🐙 GitHub 업로드 중... (잠시 기다려주세요)');
 
-  const headers = {'Authorization':`token ${token}`,'Content-Type':'application/json'};
+  const headers = {'Authorization':`token ${token}`,'Content-Type':'application/json','Accept':'application/vnd.github+json'};
 
   // ── 헬퍼: GitHub 파일 업로드 ──
   async function ghPut(path, contentStr, msg){
@@ -2273,16 +2390,25 @@ async function syncToGithub(){
     // 기존 SHA 조회
     let sha = '';
     const r = await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${path}`,{headers});
+    if(r.status === 401){
+      localStorage.removeItem('gh_token');
+      throw new Error('토큰이 만료됐거나 잘못됐습니다 (401).\n\n다음에 버튼을 누르면 토큰을 다시 입력할 수 있어요.\ngithub.com → Settings → Developer settings → Personal access tokens (classic) → Generate new token');
+    }
+    if(r.status === 403){
+      const body = await r.json();
+      throw new Error('권한 없음 (403): ' + (body.message || '') + '\n\n토큰에 repo 권한이 있는지 확인하세요.');
+    }
     if(r.ok){ sha = (await r.json()).sha || ''; }
+
     // 업로드
     const res = await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${path}`,{
       method:'PUT', headers,
       body: JSON.stringify({message:msg, content:b64, ...(sha?{sha}:{})})
     });
     if(!res.ok){
-      const e = await res.json();
+      const e = await res.json().catch(()=>({}));
       if(res.status===401){ localStorage.removeItem('gh_token'); }
-      throw new Error(`${path} 업로드 실패: ${e.message||res.status}`);
+      throw new Error(`업로드 실패 (HTTP ${res.status}): ${e.message||'알 수 없는 오류'}`);
     }
     return res;
   }
@@ -2308,10 +2434,19 @@ async function syncToGithub(){
     const payload = {markers:markerData, lines:lineData, updatedAt:new Date().toISOString()};
     await ghPut(GH_FILE, JSON.stringify(payload,null,2), `데이터 업데이트 ${new Date().toLocaleString('ko-KR')}`);
 
-    sb(`✅ 완료! 마커 ${markerData.length}개 · 경로선 ${lineData.length}개 → 1~2분 후 github.io 반영`);
+    sb(`✅ 완료! 마커 ${markerData.length}개 · 경로선 ${lineData.length}개 업로드됨 → 1~2분 후 github.io 반영`);
+    // 완료 알림
+    setTimeout(()=>{ alert(`✅ GitHub 업로드 성공!\n\n마커 ${markerData.length}개 저장됨\n1~2분 후 아래 주소에서 확인:\nhttps://${GH_REPO.split('/')[0]}.github.io/${GH_REPO.split('/')[1]}/`); }, 100);
   }catch(e){
-    alert('오류: ' + e.message + '\n\n토큰이 만료됐으면 다시 발급하세요.');
+    sb('❌ GitHub 업로드 실패');
+    alert('❌ GitHub 업로드 실패\n\n' + e.message);
   }
+}
+
+// 토큰 리셋 함수 (콘솔 또는 버튼에서 호출 가능)
+function resetGithubToken(){
+  localStorage.removeItem('gh_token');
+  alert('토큰이 삭제됐습니다. 다음에 동기화 버튼을 누르면 새로 입력할 수 있어요.');
 }
 
 /* ════════════════════════════════
@@ -2549,6 +2684,80 @@ function bulkDelete(){
     document.getElementById('setup-modal').classList.add('hidden');
     loadLocal();
   }
+})();
+
+/* ════════════════════════════════
+   사이드바 토글 + 모바일 대응
+════════════════════════════════ */
+(function initSidebarToggle(){
+  const sidebar = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('sidebar-toggle');
+  const statusbar = document.getElementById('statusbar');
+  const mobOverlay = document.getElementById('mob-overlay');
+  const isMobile = () => window.innerWidth <= 768;
+
+  let sidebarOpen = true;
+
+  // 모바일이면 처음에 닫힌 상태로 시작
+  if(isMobile()){
+    sidebarOpen = false;
+    sidebar.classList.add('collapsed');
+    toggleBtn.textContent = '▶';
+    statusbar.style.left = '0';
+  }
+
+  window.toggleSidebar = function(){
+    if(isMobile()){
+      if(!sidebarOpen){
+        // 열기
+        sidebarOpen = true;
+        sidebar.classList.remove('collapsed');
+        toggleBtn.textContent = '◀';
+        mobOverlay.classList.add('show');
+        document.body.classList.add('sidebar-open');
+      } else {
+        closeSidebarMobile();
+      }
+    } else {
+      if(sidebarOpen){
+        // 닫기
+        sidebarOpen = false;
+        sidebar.classList.add('collapsed');
+        toggleBtn.textContent = '▶';
+        statusbar.style.left = '0';
+      } else {
+        // 열기
+        sidebarOpen = true;
+        sidebar.classList.remove('collapsed');
+        toggleBtn.textContent = '◀';
+        statusbar.style.left = '290px';
+      }
+    }
+    // 지도 크기 재계산 (Leaflet)
+    setTimeout(()=>{ if(typeof map!=='undefined') map.invalidateSize(); }, 320);
+  };
+
+  window.closeSidebarMobile = function(){
+    sidebarOpen = false;
+    sidebar.classList.add('collapsed');
+    toggleBtn.textContent = '▶';
+    mobOverlay.classList.remove('show');
+    document.body.classList.remove('sidebar-open');
+  };
+
+  // 윈도우 크기 변경 시 대응
+  window.addEventListener('resize', ()=>{
+    if(!isMobile()){
+      mobOverlay.classList.remove('show');
+      if(sidebarOpen){
+        statusbar.style.left = '290px';
+      } else {
+        statusbar.style.left = '0';
+      }
+    } else {
+      statusbar.style.left = '0';
+    }
+  });
 })();
 </script>
 </body>
