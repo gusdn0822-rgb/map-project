@@ -1613,7 +1613,6 @@ function mkMarker(ll,cat,id,name,type,floor,status,memo,zone,addr,photos){
               .bindPopup(L.popup({maxWidth:260}).setContent(mkPopupHTML(cat,id,name,type,floor,status,memo,zone,addr,photos)));
   if(hiddenCats.has(cat.id)){
     m.setOpacity(0);
-    // 지도에 추가된 후 pointer-events 제거 (addTo 직후엔 element가 바로 있음)
     setTimeout(()=>{ const el=m.getElement(); if(el) el.style.pointerEvents='none'; },0);
   }
 
@@ -1631,7 +1630,7 @@ function mkMarker(ll,cat,id,name,type,floor,status,memo,zone,addr,photos){
     }
   });
 
-  // 다중 선택 모드: 클릭으로 선택 토글 (팝업 열림 방지)
+  // 다중 선택 모드: 클릭으로 선택 토글
   m.on('click', function(e){
     if(!isMultiSelect) return;
     L.DomEvent.stopPropagation(e);
@@ -2735,39 +2734,24 @@ function importJSON(e){
       const data=JSON.parse(ev.target.result);
       const cnt=data.markers?.length||0;
       if(!cnt){ alert('마커 데이터가 없습니다'); return; }
-
-      // 덮어쓰기 or 추가 선택
       const mode = markers.length > 0
         ? confirm(`📂 ${cnt}개 업소를 불러옵니다.\n\n확인 = 전체 교체 (기존 마커 삭제 후 불러오기)\n취소 = 추가만 (기존 마커 유지)`)
-        : true; // 기존 마커 없으면 바로 전체 교체
-
-      if(mode){
-        // 전체 교체
-        markers.forEach(m=>map.removeLayer(m.leaflet));
-        markers=[]; nid=1;
-      }
-
+        : true;
+      if(mode){ markers.forEach(m=>map.removeLayer(m.leaflet)); markers=[]; nid=1; }
       data.markers.forEach(m=>{
-        if(!mode && markers.find(x=>x.id===m.id))return; // 추가 모드: 중복 ID 스킵
+        if(!mode && markers.find(x=>x.id===m.id))return;
         const cat=CATS.find(c=>c.id===m.cat);if(!cat)return;
         const zone=m.zone||detectZone(m.lat,m.lng,m.id);
         const lf=mkMarker({lat:m.lat,lng:m.lng},cat,m.id,m.name,m.type,m.floor,m.status,m.memo,zone,m.addr||'',m.photos||[]);
         markers.push({...m,zone,addr:m.addr||'',photos:m.photos||[],leaflet:lf});
         if(m.id>=nid)nid=m.id+1;
       });
-
-      // 경로선도 있으면 복원
-      if(data.lines && data.lines.length>0){
-        lines=data.lines;
-        localStorage.setItem('ls',JSON.stringify(lines));
-      }
-
+      if(data.lines&&data.lines.length>0){ lines=data.lines; localStorage.setItem('ls',JSON.stringify(lines)); }
       persist(); drawCats(); drawList(); refreshNums();
       sb(`📂 ${cnt}개 불러옴 (${mode?'전체 교체':'추가'})`);
     }catch{ alert('파일 형식 오류'); }
   };
   r.readAsText(file);
-  // 같은 파일 재선택 가능하도록 초기화
   e.target.value='';
 }
 function clearAll(){
